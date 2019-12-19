@@ -37,8 +37,11 @@ def meta(studies, settings,
         fig.funnel(results).show()
     return results
 
-def show_forest(results):
-    fig = PMA.Fig()
+def show_forest(results, title=None):
+    if title:
+        fig = PMA.Fig(title)
+    else:
+        fig = PMA.Fig()
     fig.forest(results).show()
 
 def get_center_roi_msn_by_label(center, roi, label, tissue_type='GMV', use_tiv=False):
