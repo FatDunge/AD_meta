@@ -251,7 +251,7 @@ class PersonCAT(Person):
     def get_presonal_info_values(self):
         """get personal info file value
         
-        Returns: list, first line of personal info file, [age, male, female]
+        Returns: list, first line of personal info file, [age, male, female, MMSE]
         """
         if self.personal_info is not None:
             values = self.personal_info.values[0]

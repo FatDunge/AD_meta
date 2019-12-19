@@ -113,7 +113,7 @@ class CenterCAT(Center):
                 value = 0
                 count = 0
                 for person in persons:
-                    age, male, _ = person.get_presonal_info_values()
+                    age, male, *_ = person.get_presonal_info_values()
                     if gender == 'male' and male:
                         value += age
                         count += 1
@@ -146,7 +146,7 @@ class CenterCAT(Center):
                 persons = self.get_by_label(i)
                 count = 0
                 for person in persons:
-                    _, male, _ = person.get_presonal_info_values()
+                    _, male, *_ = person.get_presonal_info_values()
                     if male:
                         count += 1
                 counts.append(count)

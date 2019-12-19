@@ -99,7 +99,7 @@ center_list = datasets.load_centers_mcad(use_nii=False, use_csv=True,
                                          use_xml=True)
 for center in center_list:
     for person in center.persons:
-        personal_info = person.get_presonal_info_values()
+        personal_info = person.get_presonal_info_values()[0:3]
         tiv = person.get_tiv()
         intercept = 1
         label = person.get_label_binary()
@@ -116,7 +116,7 @@ beta_a = beta[:4]
 
 for center in center_list:
     for person in center.persons:
-        personal_info = person.get_presonal_info_values()
+        personal_info = person.get_presonal_info_values()[0:3]
         tiv = person.get_tiv()
         x = np.hstack((personal_info, tiv))
         y = person.dataframe.values.flatten()

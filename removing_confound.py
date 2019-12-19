@@ -16,7 +16,7 @@ def create_xy(center, _mask):
     d = _mask.get_mask_data().flatten()
     index = get_index(d, 0)
     for person in center.persons:
-        personal_info = person.get_presonal_info_values()
+        personal_info = person.get_presonal_info_values()[0:3]
         tiv = person.get_tiv()
         intercept = 1
         label = person.get_label_binary()
@@ -62,7 +62,7 @@ for center in centers:
         header.set_data_dtype(np.float32)
 
         image = np.zeros(shape=(181*217*181))
-        personal_info = person.get_presonal_info_values()
+        personal_info = person.get_presonal_info_values()[0:3]
         tiv = person.get_tiv()
         x = np.hstack((personal_info, tiv))
         y = np.asarray(person.nii.dataobj).flatten()[index]
