@@ -55,7 +55,8 @@ class CenterCAT(Center):
                                         use_personal_info, use_xml,
                                         nii_prefix,
                                         csv_prefix, personal_info_prefix, xml_prefix)
-
+        self.labels = labels
+        self.use_personal_info = use_personal_info
         self.persons = self.load_persons()
 
     def load_persons(self):
@@ -101,3 +102,55 @@ class CenterCAT(Center):
 
     def create_dir(self, dir_name):
         os.mkdir(os.path.join(self.file_dir, dir_name))
+    
+    def get_avg_age(self, gender=None):
+        if self.use_personal_info:
+            avgs = []
+            total_value = 0
+            total_count = 0
+            for i in range(len(self.labels)):
+                persons = self.get_by_label(i)
+                value = 0
+                count = 0
+                for person in persons:
+                    age, male, _ = person.get_presonal_info_values()
+                    if gender == 'male' and male:
+                        value += age
+                        count += 1
+                    elif gender == 'female' and not male:
+                        value += age
+                        count += 1
+                    elif not gender:
+                        value += age
+                        count += 1
+                    else:
+                        raise ValueError('gender {} not found'.format(gender))
+                if count == 0:
+                    avgs.append(0)
+                else:
+                    avgs.append(value/count)
+                total_value += value
+                total_count += count
+            if total_count == 0:
+                avgs.append(0)
+            else:
+                avgs.append(total_value/total_count)
+            return avgs
+        else:
+            raise ValueError('personal info not load')
+
+    def get_male_count(self):
+        if self.use_personal_info:
+            counts = []
+            for i in range(len(self.labels)):
+                persons = self.get_by_label(i)
+                count = 0
+                for person in persons:
+                    _, male, _ = person.get_presonal_info_values()
+                    if male:
+                        count += 1
+                counts.append(count)
+            counts.append(sum(counts))
+            return counts
+        else:
+            raise ValueError('personal info not load')
