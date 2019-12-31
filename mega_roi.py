@@ -41,6 +41,8 @@ center_edsd = datasets.load_centers_edsd(use_csv=True,
                                          csv_prefix=csv_prefix)
 center_mcad = datasets.load_centers_mcad(use_csv=True,
                                          csv_prefix=csv_prefix)
+center_adni = datasets.load_centers_adni(use_csv=True,
+                                         csv_prefix=csv_prefix)
 rois = [str(i) for i in range(1,247)]
 
 for center in centers:
@@ -49,7 +51,7 @@ for center in centers:
     elif center == 'EDSD':
         center_list = center_edsd
     else:
-        center_list = center_edsd + center_mcad
+        center_list = center_edsd + center_mcad + center_adni
     for group in groups:
         eg = group[0]
         cg = group[1]
@@ -78,6 +80,8 @@ for center in centers:
                     sign = '*'
                 else:
                     sign = 'NS'
+
+                
                 
                 writer.writerow({'ID': roi, 'NAME': name,'ES': es,
                                 'LCI': lci, 'UCI': uci,
@@ -124,60 +128,14 @@ for center in center_list:
         y_new = y - y_hat
         person.create_other_csv(y_new)
 #%%
-import datasets
-import numpy as np
-centers_edsd = datasets.load_centers_edsd(use_csv=True,
-                                         csv_prefix='csv/{}.csv')
-centers_mcad = datasets.load_centers_mcad(use_csv=True,
-                                         csv_prefix='csv/{}.csv')
+from mask import Mask
+import pandas as pd
+csv_path = './report/roi/brainnetome/ALL_ADMCI.csv'
 
-x = []
-for center in center_list:
-    for person in center.persons:
-        x.append(person.dataframe.values.flatten())
-x = np.array(x)
-x = robust_scale(x)
-#%%
+mask = Mask('./data/mask', 'rBN_Atlas_246_1mm.nii')
+df = pd.read_csv(csv_path, index_col=0)
 
 # %%
-
-# %%
-
-
-# %%
-import datasets
-import csv
-import numpy as np
-from scipy.stats import ttest_ind_from_stats
-csv_prefix = 'csv/{}.csv'
-
-center_edsd = datasets.load_centers_edsd(use_csv=True,
-                                         csv_prefix=csv_prefix)
-center_mcad = datasets.load_centers_mcad(use_csv=True,
-                                         csv_prefix=csv_prefix)
-center_list = center_edsd + center_mcad
-rois = [0, 99, 152, 214]
-i = 1
-for center in center_list:
-    values = None
-    with open('./tmp/center{}.csv'.format(i), 'w', newline='') as file:
-        fieldnames = ['person', 'label', 'roi1', 'roi100', 'roi153', 'roi215']
-        writer = csv.DictWriter(file, fieldnames=fieldnames)
-        writer.writeheader()
-    
-        eg = center.get_by_label(2)
-        cg = center.get_by_label(0)
-
-        for person in eg:
-            values = person.dataframe.values.flatten()
-            writer.writerow({'person': person.filename, 'label': person.label,
-                'roi1':values[rois[0]], 'roi100':values[rois[1]],
-                'roi153':values[rois[2]], 'roi215':values[rois[3]]})
-        for person in cg:
-            values = person.dataframe.values.flatten()
-            writer.writerow({'person': person.filename,'label': person.label,
-                'roi1':values[rois[0]], 'roi100':values[rois[1]],
-                'roi153':values[rois[2]], 'roi215':values[rois[3]]})
-    i += 1
+df
 
 # %%

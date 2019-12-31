@@ -10,8 +10,10 @@ centers_mcad = datasets.load_centers_mcad(use_nii=False, use_csv=False,
                                           use_personal_info=True, use_xml=True)
 centers_edsd = datasets.load_centers_edsd(use_nii=False, use_csv=False,
                                           use_personal_info=True, use_xml=True)
+centers_adni = datasets.load_centers_adni(use_nii=False, use_csv=False,
+                                          use_personal_info=True, use_xml=True)
 
-center_list = centers_mcad + centers_edsd
+center_list = centers_mcad + centers_edsd + centers_adni
 #%%
 def get_data_msn(persons, confound='MMSE'):
     if confound == 'MMSE':
@@ -19,7 +21,7 @@ def get_data_msn(persons, confound='MMSE'):
     elif confound == 'TIV':
         data = np.array([person.get_tiv() for person in persons])
     elif confound == 'GMV':
-        data = np.array([person.get_total_cgw_volumn()[1] for person in persons])
+        data = np.array([person.get_total_cgw_volume()[1] for person in persons])
     mean = np.nanmean(data)
     std = np.nanstd(data)
     count = np.count_nonzero(~np.isnan(data))
@@ -29,7 +31,7 @@ def gen_study(center, study, label_eg, label_cg, confound):
     mean_eg, std_eg, count_eg = get_data_msn(center.get_by_label(label_eg), confound)
     mean_cg, std_cg, count_cg = get_data_msn(center.get_by_label(label_cg), confound)
     
-    if count_eg != 0 and count_cg != 0:
+    if count_eg != 0 and count_cg != 0 and count_eg+count_cg>20:
         study.append('{}, {}, {}, {}, {}, {}, {}'.format(center.name,
                                                         mean_eg, std_eg, count_eg,
                                                         mean_cg, std_cg, count_cg))
@@ -51,3 +53,6 @@ for confound in confounds:
         meta_analysis.show_forest(results, title='{}-{}{}'.format(confound,
                                                                   labels[pair[0]],labels[pair[1]]))
 
+
+
+# %%

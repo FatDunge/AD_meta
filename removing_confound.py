@@ -5,7 +5,7 @@ import numpy as np
 import mask
 import nibabel as nib
 
-dataset = 'EDSD'
+dataset = 'ADNI'
 
 def get_index(lst, item):
     return [i for i in range(len(lst)) if lst[i] > item]
@@ -36,8 +36,14 @@ if dataset == 'MCAD':
                                          use_personal_info=True,
                                          use_xml=True,
                                          nii_prefix='mri_smoothed/{}.nii')
-else:
+elif dataset == 'EDSD':
     centers = datasets.load_centers_edsd(use_nii=True,
+                                         use_csv=False,
+                                         use_personal_info=True,
+                                         use_xml=True,
+                                         nii_prefix='mri_smoothed/{}.nii')
+elif dataset == 'ADNI':
+    centers = datasets.load_centers_adni(use_nii=True,
                                          use_csv=False,
                                          use_personal_info=True,
                                          use_xml=True,

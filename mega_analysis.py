@@ -72,16 +72,29 @@ d = _mask.get_mask_data().flatten()
 n = len(d[d>0])
 nii_prefix = 'mri_smoothed_removed/{}.nii'
 
-centers = ['EDSD', 'MCAD']
-corrections = [False, True]
+centers = ['ALL', 'ADNI']
+corrections = [True]
 labels = ['NC', 'MCI', 'AD']
-pairs = [(2, 0), (1, 0), (2, 1)]
+pairs = [(2,0), (1, 0), (2, 1)]
+
+centers_list = datasets.load_centers_edsd(use_nii=True, use_csv=False,
+                                                  nii_prefix=nii_prefix)
+centers_list = datasets.load_centers_mcad(use_nii=True, use_csv=False,
+                                                  nii_prefix=nii_prefix)
+centers_list = datasets.load_centers_adni(use_nii=True, use_csv=False,
+                                                  nii_prefix=nii_prefix)
 
 for center in centers:
     if center == 'EDSD':
         centers_list = datasets.load_centers_edsd(use_nii=True, use_csv=False,
                                                   nii_prefix=nii_prefix)
-    else:
+    elif center == 'MCAD':
+        centers_list = datasets.load_centers_mcad(use_nii=True, use_csv=False,
+                                                  nii_prefix=nii_prefix)
+    elif center == 'MCAD':
+        centers_list = datasets.load_centers_mcad(use_nii=True, use_csv=False,
+                                                  nii_prefix=nii_prefix)
+    elif center == 'ALL':
         centers_list = datasets.load_centers_mcad(use_nii=True, use_csv=False,
                                                   nii_prefix=nii_prefix)
     for pair in pairs:
