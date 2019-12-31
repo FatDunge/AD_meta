@@ -40,7 +40,7 @@ class Person(object):
         file_dir: string, center's dir
         filename: string, person's no
         nii_prefix: string, full name of nii file lack of person's no
-        csv_prefix: string, full name of region volumn csv file lack of person's no
+        csv_prefix: string, full name of region volume csv file lack of person's no
         presonal_info_prefix: string, full name of personal info csv file lack of person's no
         xml_prefix: string, full name of xml file lack of person's no
 
@@ -50,7 +50,7 @@ class Person(object):
         load_csv
         load_report
         get_tiv
-        get_total_cgw_volumn
+        get_total_cgw_volume
     """
     def __init__(self, file_dir, filename,
                  labels=['NC', 'MC', 'AD'],
@@ -100,20 +100,20 @@ class Person(object):
         """
         raise NotImplementedError('get_tiv')
 
-    def get_total_cgw_volumn(self):
+    def get_total_cgw_volume(self):
         """inherited class should override this method
         """
-        raise NotImplementedError('get_total_cgw_volumn')
+        raise NotImplementedError('get_total_cgw_volume')
 
-def get_volumn(mask_data, data):
-    """apply a mask to file then calculate volumn
+def get_volume(mask_data, data):
+    """apply a mask to file then calculate volume
 
         Args:
             mask_data: ndarray
             data: ndarray, shape should be the same with $mask_data$
 
         Returns:
-            volumn of data
+            volume of data
     """
     assert mask_data.shape == data.shape
     masked_data = np.multiply(mask_data, data)
@@ -134,7 +134,7 @@ class PersonCAT(Person):
         gm: niimage, person's segmented gm niimage
         wm: niimage, person's segmented wm niimage
         label: int, 0 for NC, 1 for MCI, 2 for AD
-        dataframe: dataframe, region volumn load from csv
+        dataframe: dataframe, region volume load from csv
         report: ElementTree, person's CAT analysis report
     """
 
@@ -182,11 +182,11 @@ class PersonCAT(Person):
         return ET.parse(xml_path)
 
     def create_csv(self, mask):
-        """use masks to calculate region's volumn
+        """use masks to calculate region's volume
         save GMV in csv file
 
         Args:
-            masks_dict: dict, {region_name: Mask}
+            
         """
         _min, _max = mask.get_min_max_label()
 
@@ -201,7 +201,7 @@ class PersonCAT(Person):
                 if i == 0:
                     pass
                 else:
-                    gmv = mask.get_masked_volumn(self.nii, i)
+                    gmv = mask.get_masked_volume(self.nii, i)
                     writer.writerow({'ID': i, 'GMV': gmv})
     
     def create_other_csv(self, values, csv_prefix='csv_removed/{}.csv'):
@@ -234,8 +234,8 @@ class PersonCAT(Person):
             raise FileNotLoadError(self.xml_prefix.format(self.filename))
         return float(vol_tiv)
 
-    def get_total_cgw_volumn(self):
-        """get brain total CSF, GM, WM volumn
+    def get_total_cgw_volume(self):
+        """get brain total CSF, GM, WM volume
 
         Returns:
             list, [CSF, GMV, WMV]
@@ -259,25 +259,25 @@ class PersonCAT(Person):
             raise FileNotLoadError('personal_info')
         return values
 
-    def get_region_volumn(self, region, tissue_type='GMV', use_tiv=False):
-        """get DMN region's volumn
+    def get_region_volume(self, region, tissue_type='GMV', use_tiv=False):
+        """get DMN region's volume
 
         Args:
             region: string, region's filename
             tissue_type: string, indicate tissue_type to get from $dataframe$
-            use_tiv: bool, whether to divide tiv while calculating region volumn
+            use_tiv: bool, whether to divide tiv while calculating region volume
 
         Returns:
-            float, region's volumn
+            float, region's volume
         """
         if self.dataframe is not None:
             if use_tiv:
-                volumn = self.dataframe[tissue_type][region]/self.get_tiv()
+                volume = self.dataframe[tissue_type][region]/self.get_tiv()
             else:
-                volumn = self.dataframe[tissue_type][region]
+                volume = self.dataframe[tissue_type][region]
         else:
             raise FileNotLoadError('csv')
-        return volumn
+        return volume
 
     def save_smoothed_image(self, nii, fwhm=4, mode='nearest',
                             prefix='mri_smoothed/{}.nii'):

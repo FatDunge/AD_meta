@@ -55,7 +55,7 @@ class Mask(object):
         data = np.asarray(image.dataobj)
         return np.multiply(mask_data, data)
 
-    def get_masked_volumn(self, image, label):
+    def get_masked_volume(self, image, label):
         return np.sum(self.get_masked_image_data(image, label))
 
 

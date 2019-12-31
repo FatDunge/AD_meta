@@ -58,7 +58,7 @@ def get_center_roi_msn_by_label(center, roi, label, tissue_type='GMV', use_tiv=F
         A tuple of (mean, std, n)
     """
     persons = center.get_by_label(label)
-    data = [person.get_region_volumn(int(roi), tissue_type, use_tiv=use_tiv) for person in persons]
+    data = [person.get_region_volume(int(roi), tissue_type, use_tiv=use_tiv) for person in persons]
     data = np.array(data)
     mean = np.mean(data, axis=0)
     std = np.std(data, axis=0)
@@ -88,7 +88,7 @@ def gen_roi_study(centers_list, roi, label_eg, label_cg, tissue_type='GMV', use_
         mean_cg, std_cg, count_cg = get_center_roi_msn_by_label(center, roi, label_cg,
                                                             tissue_type=tissue_type,
                                                             use_tiv=use_tiv)
-        if count_eg == 0 or count_cg == 0:
+        if count_eg == 0 or count_cg == 0 or count_cg + count_eg < 30:
             pass
         else:
             study.append('{}, {}, {}, {}, {}, {}, {}'.format(center.name,
