@@ -66,9 +66,7 @@ for result in results:
         nii = nil.image.concat_imgs([es, lci, uci, se, i2, z, p, sign])
         nii_path = os.path.join(results_path, result[:-4]) + '.nii'
         nifti1.save(nii, nii_path)
-        #---------
-        df_sorted = df.sort_values(by='ES', ascending=False)
-        draw(df_sorted)
+
 
 #%%
 def draw(df, title, n=20, gap=0.01, box_size=0.04):
