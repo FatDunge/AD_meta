@@ -78,5 +78,29 @@ def load_centers_edsd(data_path='./data/AD/EDSD/EDSD_T1',
         centers.append(_center)
     return centers
 
+def load_centers_adni(data_path='./data/AD/ADNI',
+                      use_nii=False, use_csv=False,
+                      use_personal_info=False, use_xml=False,
+                      nii_prefix='mri/mwp1_{}.nii',
+                      personal_info_prefix='personal_info/{}.csv',
+                      csv_prefix='csv/{}.csv', 
+                      xml_prefix='report/mwp1_{}.xml'):
+    centers = []
+    center_names = os.listdir(data_path)
+
+    for center_name in center_names:
+        center_path = os.path.join(data_path, center_name)
+        _center = center.CenterCAT(center_path, 'filenames.txt',
+                                   labels=['NC', 'MC', 'AD'],
+                                   use_nii=use_nii, use_csv=use_csv,
+                                   use_personal_info=use_personal_info,
+                                   use_xml=use_xml,
+                                   nii_prefix=nii_prefix,
+                                   personal_info_prefix=personal_info_prefix,
+                                   csv_prefix=csv_prefix,
+                                   xml_prefix=xml_prefix)
+        centers.append(_center)
+    return centers
+
 if __name__ == "__main__":
     pass
