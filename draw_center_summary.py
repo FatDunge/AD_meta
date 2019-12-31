@@ -4,10 +4,12 @@ import numpy as np
 import scipy
 import matplotlib.pyplot as plt
 
-centers = ['EDSD', 'MCAD']
+centers = ['EDSD', 'MCAD', 'ADNI']
 centers_mcad = datasets.load_centers_mcad(use_nii=False, use_csv=False,
                                                   use_personal_info=True)
 centers_edsd = datasets.load_centers_edsd(use_nii=False, use_csv=False,
+                                                  use_personal_info=True)
+centers_adni = datasets.load_centers_adni(use_nii=False, use_csv=False,
                                                   use_personal_info=True)
 #%%
 ncs = []
@@ -21,8 +23,10 @@ for center_name in centers:
         center_list = centers_edsd
     elif center_name == 'MCAD':
         center_list = centers_mcad
+    elif center_name == 'ADNI':
+        center_list = centers_adni
     else:
-        center_list = centers_mcad + centers_edsd
+        center_list = centers_mcad + centers_edsd + centers_adni
     
     for center in center_list:
         nc.append(len(center.get_by_label(0)))
