@@ -52,8 +52,7 @@ class Person(object):
         get_tiv
         get_total_cgw_volume
     """
-    def __init__(self, file_dir, filename,
-                 labels=['NC', 'MC', 'AD'],
+    def __init__(self, file_dir, filename, label,
                  nii_prefix='mri/{}.nii',
                  csv_prefix='csv/{}.csv',
                  personal_info_prefix='personal_info/{}.csv',
@@ -61,16 +60,13 @@ class Person(object):
         super(Person, self).__init__()
         self.file_dir = file_dir
         self.filename = filename
-        self.labels = labels
+        self.label = label
         self.nii_prefix = nii_prefix
         self.csv_prefix = csv_prefix
         self.personal_info_prefix = personal_info_prefix
         self.xml_prefix = xml_prefix
 
-        self.label = None
         self.nii = None
-        self.grey_matter = None
-        self.white_matter = None
         self.personal_info = None
         self.dataframe = None
         self.report = None
@@ -131,31 +127,21 @@ class PersonCAT(Person):
         use_presonal_info: bool, whether to load personal info
         use_xml: bool, whether to load xml
         nii: niimage, person's niimage
-        gm: niimage, person's segmented gm niimage
-        wm: niimage, person's segmented wm niimage
         label: int, 0 for NC, 1 for MCI, 2 for AD
         dataframe: dataframe, region volume load from csv
         report: ElementTree, person's CAT analysis report
     """
 
-    def __init__(self, file_dir, filename,
-                 labels=['NC', 'MC', 'AD'],
+    def __init__(self, file_dir, filename, label,
                  use_nii=False, use_csv=True, 
                  use_personal_info=False, use_xml=False,
                  nii_prefix='mri/wm{}.nii',
                  csv_prefix='csv/{}.csv',
                  personal_info_prefix='personal_info/{}.csv',
                  xml_prefix='report/cat_{}.xml'):
-        super(PersonCAT, self).__init__(file_dir, filename, labels,
+        super(PersonCAT, self).__init__(file_dir, filename, label,
                                         nii_prefix, csv_prefix,
                                         personal_info_prefix, xml_prefix)
-
-        for label in labels:
-            if label in self.filename:
-                self.label = labels.index(label)
-        #filename should contain one of these flags
-        if self.label is None:
-            raise FilenameError(filename)
 
         if use_nii:
             self.nii = self.load_nii(nii_prefix)

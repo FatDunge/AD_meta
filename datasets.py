@@ -18,7 +18,7 @@ def load_masks(mask_dir='./data/DMN_region'):
     """
     return mask.Masks(mask_dir)
 
-def load_centers_mcad(use_nii=False, use_csv=False,
+def load_centers_mcad(filenames='origin.csv', use_nii=False, use_csv=False,
                       use_personal_info=False, use_xml=False,
                       nii_prefix='mri/{}.nii',
                       personal_info_prefix='personal_info/{}.csv',
@@ -37,7 +37,7 @@ def load_centers_mcad(use_nii=False, use_csv=False,
     centers = []
     for i in range(1, 9):
         center_path = './data/AD/MCAD/AD_S0{0}/AD_S0{0}_MPR'.format(i)
-        _center = center.CenterCAT(center_path, 'filenames.txt',
+        _center = center.CenterCAT(center_path, filenames,
                                    use_nii=use_nii, use_csv=use_csv, 
                                    use_personal_info=use_personal_info,
                                    use_xml=use_xml,
@@ -48,6 +48,7 @@ def load_centers_mcad(use_nii=False, use_csv=False,
     return centers
 
 def load_centers_edsd(data_path='./data/AD/EDSD/EDSD_T1',
+                      filenames='origin.csv',
                       use_nii=False, use_csv=False,
                       use_personal_info=False, use_xml=False,
                       nii_prefix='mri/{}.nii',
@@ -67,8 +68,7 @@ def load_centers_edsd(data_path='./data/AD/EDSD/EDSD_T1',
 
     for center_name in center_names:
         center_path = os.path.join(data_path, center_name)
-        _center = center.CenterCAT(center_path, 'filenames.txt',
-                                   labels=['HC', 'MC', 'AD'],
+        _center = center.CenterCAT(center_path, filenames,
                                    use_nii=use_nii, use_csv=use_csv,
                                    use_personal_info=use_personal_info,
                                    use_xml=use_xml,
@@ -79,6 +79,7 @@ def load_centers_edsd(data_path='./data/AD/EDSD/EDSD_T1',
     return centers
 
 def load_centers_adni(data_path='./data/AD/ADNI',
+                      filenames='origin.csv',
                       use_nii=False, use_csv=False,
                       use_personal_info=False, use_xml=False,
                       nii_prefix='mri/mwp1_{}.nii',
@@ -90,8 +91,7 @@ def load_centers_adni(data_path='./data/AD/ADNI',
 
     for center_name in center_names:
         center_path = os.path.join(data_path, center_name)
-        _center = center.CenterCAT(center_path, 'filenames.txt',
-                                   labels=['NC', 'MC', 'AD'],
+        _center = center.CenterCAT(center_path, filenames,
                                    use_nii=use_nii, use_csv=use_csv,
                                    use_personal_info=use_personal_info,
                                    use_xml=use_xml,
