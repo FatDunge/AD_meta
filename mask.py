@@ -58,6 +58,35 @@ class Mask(object):
     def get_masked_volume(self, image, label):
         return np.sum(self.get_masked_image_data(image, label))
 
+    def get_all_masked_volume(self, image):
+        volumes = []
+        _min, _max = self.get_min_max_label()
+        for i in range(_min, _max+1):
+            if i == 0:
+                pass
+            else:
+                volumes.append(self.get_masked_volume(image, i))
+        return volumes
+    
+    def get_masked_count(self, image, label):
+        mask_data = self.get_mask_data(label)
+        count = np.sum(mask_data==True)
+        return count
+
+    def get_masked_mean(self, image, label):
+        volume = self.get_masked_volume(image, label)
+        count = self.get_masked_count(image, label)
+        return volume / count
+    
+    def get_all_masked_mean(self, image):
+        means = []
+        _min, _max = self.get_min_max_label()
+        for i in range(_min, _max+1):
+            if i == 0:
+                pass
+            else:
+                means.append(self.get_masked_mean(image, i))
+        return means
 
 class Masks(object):
     """class to manage all Mask instance
