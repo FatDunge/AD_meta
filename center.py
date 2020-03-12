@@ -1,14 +1,17 @@
 """
 TODO: add license
 """
+import csv
 import os
 import re
+
+import pandas as pd
+
 import person
 
 class Center(object):
     """docstring for Center"""
     def __init__(self, file_dir, name, filenames,
-                 labels=['NC', 'MC', 'AD'],
                  use_nii=False, use_csv=True, 
                  use_personal_info=False, use_xml=True,
                  nii_prefix='mri/{}.nii',
@@ -23,7 +26,6 @@ class Center(object):
         self.use_csv = use_csv
         self.use_personal_info = use_personal_info
         self.use_xml = use_xml
-        self.labels = labels
         self.nii_prefix = nii_prefix
         self.csv_prefix = csv_prefix
         self.personal_info_prefix = personal_info_prefix
@@ -34,15 +36,14 @@ class CenterCAT(Center):
 
     Attributes:
         file_dir: string, center's dir
-        filenames: string, filepath to a txt file contains all person's no
+        filenames: string, filepath to a csv file contains all person's no and their label
         use_nii: bool, whether to load nii
         use_csv: bool, whether to load csv
         use_xml: bool, whether to load xml
         persons: list of Person
     """
 
-    def __init__(self, file_dir, filenames,
-                 labels=['NC', 'MC', 'AD'],
+    def __init__(self, file_dir, filenames='origin.csv',
                  use_nii=False, use_csv=True, 
                  use_personal_info=False, use_xml=True,
                  nii_prefix='mri/wm{}.nii',
@@ -50,12 +51,11 @@ class CenterCAT(Center):
                  personal_info_prefix='personal_info/{}.csv',
                  xml_prefix='report/cat_{}.xml'):
         name = file_dir[file_dir.rfind('/')+1:]
-        super(CenterCAT, self).__init__(file_dir, name, filenames, labels,
+        super(CenterCAT, self).__init__(file_dir, name, filenames,
                                         use_nii, use_csv, 
                                         use_personal_info, use_xml,
                                         nii_prefix,
                                         csv_prefix, personal_info_prefix, xml_prefix)
-        self.labels = labels
         self.use_personal_info = use_personal_info
         self.persons = self.load_persons()
 
@@ -66,26 +66,35 @@ class CenterCAT(Center):
             list of Person
         """
         persons = []
-        txt_path = os.path.join(self.file_dir, self.filenames)
+        csv_path = os.path.join(self.file_dir, self.filenames)
         #get person's filename in txt file
-        with open(txt_path) as txt:
-            for filename in txt:
-                try:
-                    filename = filename.replace('\n', '')
-                    _person = person.PersonCAT(self.file_dir, filename,
-                                               self.labels,
-                                               use_nii=self.use_nii,
-                                               use_csv=self.use_csv,
-                                               use_personal_info=self.use_personal_info,
-                                               use_xml=self.use_xml,
-                                               nii_prefix=self.nii_prefix,
-                                               csv_prefix=self.csv_prefix,
-                                               personal_info_prefix=self.personal_info_prefix,
-                                               xml_prefix=self.xml_prefix)
-                    persons.append(_person)
-                except FileNotFoundError:
-                    print('File {}/{} Not Found'.format(self.file_dir, filename))
+        df = pd.read_csv(csv_path, index_col=0)
+        for index, value in df.iterrows():
+            try:
+                filename = index
+                label = value['label']
+                _person = person.PersonCAT(self.file_dir, filename, label,
+                                            use_nii=self.use_nii,
+                                            use_csv=self.use_csv,
+                                            use_personal_info=self.use_personal_info,
+                                            use_xml=self.use_xml,
+                                            nii_prefix=self.nii_prefix,
+                                            csv_prefix=self.csv_prefix,
+                                            personal_info_prefix=self.personal_info_prefix,
+                                            xml_prefix=self.xml_prefix)
+                persons.append(_person)
+            except FileNotFoundError:
+                print('File {}/{} Not Found'.format(self.file_dir, filename))
         return persons
+
+    def save_labels(self, filename):
+        path = os.path.join(self.file_dir, filename)
+        with open(path, 'w', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=['filename', 'label'])
+            writer.writeheader()
+            for person in self.persons:
+                writer.writerow({'filename':person.filename,
+                                 'label':person.label})
 
     def get_by_label(self, label):
         """get list of Person in specified label
@@ -102,55 +111,3 @@ class CenterCAT(Center):
 
     def create_dir(self, dir_name):
         os.mkdir(os.path.join(self.file_dir, dir_name))
-    
-    def get_avg_age(self, gender=None):
-        if self.use_personal_info:
-            avgs = []
-            total_value = 0
-            total_count = 0
-            for i in range(len(self.labels)):
-                persons = self.get_by_label(i)
-                value = 0
-                count = 0
-                for person in persons:
-                    age, male, *_ = person.get_presonal_info_values()
-                    if gender == 'male' and male:
-                        value += age
-                        count += 1
-                    elif gender == 'female' and not male:
-                        value += age
-                        count += 1
-                    elif not gender:
-                        value += age
-                        count += 1
-                    else:
-                        raise ValueError('gender {} not found'.format(gender))
-                if count == 0:
-                    avgs.append(0)
-                else:
-                    avgs.append(value/count)
-                total_value += value
-                total_count += count
-            if total_count == 0:
-                avgs.append(0)
-            else:
-                avgs.append(total_value/total_count)
-            return avgs
-        else:
-            raise ValueError('personal info not load')
-
-    def get_male_count(self):
-        if self.use_personal_info:
-            counts = []
-            for i in range(len(self.labels)):
-                persons = self.get_by_label(i)
-                count = 0
-                for person in persons:
-                    _, male, *_ = person.get_presonal_info_values()
-                    if male:
-                        count += 1
-                counts.append(count)
-            counts.append(sum(counts))
-            return counts
-        else:
-            raise ValueError('personal info not load')
