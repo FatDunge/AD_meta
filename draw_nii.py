@@ -73,3 +73,25 @@ for filename in filenames:
 
 
 # %%
+from nilearn import plotting
+import os
+import matplotlib
+import nibabel as nib
+from nilearn.regions import connected_regions
+from nibabel import nifti1
+
+from nilearn import image
+
+centers = ['ALL']
+for center in centers:
+    file_path = './report/{}'.format(center)
+    filenames = os.listdir(file_path)
+
+    for filename in filenames:
+        if '_with_' in filename:
+            nii_path = os.path.join(file_path, filename)
+            es = image.index_img(nii_path, 0)
+            plotting.plot_stat_map(es, title=filename)
+
+# %%
+ 
