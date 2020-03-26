@@ -18,9 +18,9 @@ import datasets
 from mask import Mask
 import numpy as np
 from scipy.stats import norm
-from meta_analysis import gen_roi_studies
-from meta_analysis import meta
-from meta_analysis import show_forest
+from meta import gen_roi_studies
+from meta import meta
+from meta import show_forest
 import csv
 import pandas as pd
 

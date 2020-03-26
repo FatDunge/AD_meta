@@ -149,7 +149,7 @@ def gen_voxel_studies(centers_list, mask, label_eg, label_cg):
         mean_eg, std_eg, count_eg = get_center_voxel_msn_by_label(center, index, label_eg)
         mean_cg, std_cg, count_cg = get_center_voxel_msn_by_label(center, index, label_cg)
         
-        if count_eg and count_cg:
+        if count_eg and count_cg and count_eg + count_cg >=5:
             means_eg.append(mean_eg)
             stds_eg.append(std_eg)
             counts_eg.append(count_eg)
