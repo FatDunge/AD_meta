@@ -43,3 +43,41 @@ with open(feature_path, 'w', newline='') as feature_file:
 
 
 # %%
+from scipy import io
+import numpy as np
+
+mat = io.loadmat('./matlab/HYDRA/result/HYDRA_results.mat')
+
+#%%
+mat
+# %%
+CIDX = mat['CIDX']
+#%%
+CIDX = np.transpose(CIDX)
+#%%
+CIDX = CIDX[1]
+#%%
+print(np.unique(CIDX))
+#%%
+CIDX.shape
+#%%
+CIDX = CIDX + 1
+
+# %%
+i = 0
+for center in center_list:
+    for person in center.persons:
+        if person.label == 2 or person.label == 0:
+            person.label = CIDX[i]
+            i += 1
+
+# %%
+for center in center_list:
+    for person in center.persons:
+        print('{}:{}'.format(person.filename, person.label))
+
+# %%
+for center in center_list:
+    center.save_labels('HYDRA.csv')
+
+# %%
