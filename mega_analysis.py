@@ -15,7 +15,7 @@ import csv
 
 import datasets
 import mask
-import meta_analysis
+import meta
 #%%
 SETTINGS = {"datatype":"CONT",
             "models":"Random",
@@ -38,7 +38,7 @@ def create_es_p_image(studies, n, nii, correction=False):
         n = 1
 
     for k, v in studies.items():
-        result = meta_analysis.meta(v, SETTINGS, plot_forest=False)
+        result = meta.meta(v, SETTINGS, plot_forest=False)
 
         z = float(result[0][10])
         p = norm.sf(z) * 2
@@ -74,18 +74,19 @@ def create_es_p_image(studies, n, nii, correction=False):
 _mask = mask.Mask('./data/mask', 'grey_matter_smoothed_005.nii')
 d = _mask.get_mask_data().flatten()
 n = len(d[d>0])
-nii_prefix = 'mri_smoothed_removed/{}.nii'
+nii_prefix = 'mri_smoothed/{}.nii'
+filenames = 'HYDRA.csv'
 centers_mcad = datasets.load_centers_mcad(use_nii=True, use_csv=False,
-                                                  nii_prefix=nii_prefix)
+                                          filenames=filenames, nii_prefix=nii_prefix)
 centers_edsd = datasets.load_centers_edsd(use_nii=True, use_csv=False,
-                                                  nii_prefix=nii_prefix)
+                                          filenames=filenames, nii_prefix=nii_prefix)
 centers_adni = datasets.load_centers_adni(use_nii=True, use_csv=False,
-                                                  nii_prefix=nii_prefix)
+                                          filenames=filenames, nii_prefix=nii_prefix)
 #%%
 centers = ['ALL']
-corrections = [False]
-labels = ['NC', 'MCI', 'AD']
-pairs = [(2,0), (1, 0), (2, 1)]
+corrections = [True]
+labels = ['NC', 'MC', 'AD-1', 'AD-2']
+pairs = [(2,0), (3, 0), (3, 2)]
 #%%
 for center in centers:
     if center == 'EDSD':
@@ -104,7 +105,7 @@ for center in centers:
     for pair in pairs:
         label_eg = pair[0]
         label_cg = pair[1]
-        studies = meta_analysis.gen_voxel_studies(centers_list, _mask, label_eg, label_cg)
+        studies = meta.gen_voxel_studies(centers_list, _mask, label_eg, label_cg)
         for correction in corrections:
             nii = create_es_p_image(studies, n,
                                     centers_list[0].persons[0].nii, correction=correction)
