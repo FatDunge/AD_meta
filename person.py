@@ -144,17 +144,20 @@ class PersonCAT(Person):
                                         personal_info_prefix, xml_prefix)
 
         if use_nii:
-            self.nii = self.load_nii(nii_prefix)
+            self.nii = self.load_nii()
         if use_csv:
             self.dataframe = self.load_csv(csv_prefix)
         if use_personal_info:
             self.personal_info = self.load_csv(personal_info_prefix, index_col=None)
         if use_xml:
             self.report = self.load_report()
+        
+    def get_nii_path(self):
+        return os.path.join(self.file_dir,
+                            self.nii_prefix.format(self.filename))
 
-    def load_nii(self, prefix):
-        nii_path = os.path.join(self.file_dir,
-                                prefix.format(self.filename))
+    def load_nii(self):
+        nii_path = self.get_nii_path()
         return nib.load(nii_path)
 
     def load_csv(self, prefix, index_col=0):
