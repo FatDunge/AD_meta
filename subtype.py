@@ -1,42 +1,37 @@
 #%%
 import datasets
-centers_mcad = datasets.load_centers_mcad(use_nii=False, use_csv=True,
-                                          use_personal_info=True, use_xml=True)
-centers_edsd = datasets.load_centers_edsd(use_nii=False, use_csv=True,
-                                          use_personal_info=True, use_xml=True)
-centers_adni = datasets.load_centers_adni(use_nii=False, use_csv=True,
-                                          use_personal_info=True, use_xml=True)
-
-center_list = centers_mcad + centers_edsd + centers_adni
-#%%
-for center in center_list:
-    center.save_labels('origin.csv')
+center_list = datasets.load_centers_all()
 # %%
 #prepare HYDRA csv
 import csv
+import numpy as np
 feature_path = './matlab/HYDRA/data/features.csv'
 covariate_path = './matlab/HYDRA/data/covariate.csv'
 i = 0
 with open(feature_path, 'w', newline='') as feature_file:
-    features = center_list[0].persons[0].dataframe.values.flatten().tolist()
-    header = ['id'] + ['feature_{}'.format(i) for i in range(len(features))] + ['group']
+    header = ['id'] + ['feature_{}'.format(i) for i in range(456)] + ['group']
     featureswriter = csv.DictWriter(feature_file, fieldnames=header)
     featureswriter.writeheader()
     with open(covariate_path, 'w', newline='') as covariate_file:
         covariatewriter = csv.writer(covariate_file)
         for center in center_list:
-            for person in center.persons:
-                if person.label == 2:
+            features_rv, labels = center.get_csv_values(flatten=True)
+            features_ct, _ = center.get_csv_values(prefix='cortical_thickness/{}.csv',
+                                      flatten=True)
+            features = np.concatenate([features_rv, features_ct], axis=1)
+            personal_infos, _ = center.get_presonal_info_values()
+            tcgws, _  = center.get_tivs_cgws()
+            for feature, label, personal_info, tcgw  in zip(features, labels, personal_infos, tcgws):
+                if label == 2:
                     label = 1
-                elif person.label == 0:
+                elif label == 0:
                     label = -1
                 else:
                     continue
-                features = person.dataframe.values.flatten().tolist()
-                feature_row = [i] + features + [label]
+                feature_row = [i] + feature.tolist() + [label]
                 dictionary = dict(zip(header, feature_row))
 
-                covariate_row = [i] + person.get_presonal_info_values().tolist()[0:3] + [person.get_tiv()]
+                covariate_row = [i] + personal_info[0:3].tolist() + [tcgw.tolist()[0]]
                 featureswriter.writerow(dictionary)
                 covariatewriter.writerow(covariate_row)
                 i += 1
@@ -48,8 +43,6 @@ import numpy as np
 
 mat = io.loadmat('./matlab/HYDRA/result/HYDRA_results.mat')
 
-#%%
-mat
 # %%
 CIDX = mat['CIDX']
 #%%
@@ -70,12 +63,6 @@ for center in center_list:
         if person.label == 2 or person.label == 0:
             person.label = CIDX[i]
             i += 1
-
-# %%
-for center in center_list:
-    for person in center.persons:
-        print('{}:{}'.format(person.filename, person.label))
-
 # %%
 for center in center_list:
     center.save_labels('HYDRA.csv')
