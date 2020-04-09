@@ -1,37 +1,22 @@
 """
 TODO: add license
 """
+import ast
 import csv
 import os
 import re
+import xml.etree.ElementTree as ET
 
+import numpy as np
 import pandas as pd
 
-import person
+class Person(object):
+    def __init__(self, filename, label):
+        super(Person, self).__init__()
+        self.filename = filename
+        self.label = label
 
 class Center(object):
-    """docstring for Center"""
-    def __init__(self, file_dir, name, filenames,
-                 use_nii=False, use_csv=True, 
-                 use_personal_info=False, use_xml=True,
-                 nii_prefix='mri/{}.nii',
-                 csv_prefix='csv/{}.csv',
-                 personal_info_prefix='personal_info/{}.csv',
-                 xml_prefix='report/cat_{}.xml'):
-        super(Center, self).__init__()
-        self.file_dir = file_dir
-        self.name = name
-        self.filenames = filenames
-        self.use_nii = use_nii
-        self.use_csv = use_csv
-        self.use_personal_info = use_personal_info
-        self.use_xml = use_xml
-        self.nii_prefix = nii_prefix
-        self.csv_prefix = csv_prefix
-        self.personal_info_prefix = personal_info_prefix
-        self.xml_prefix = xml_prefix
-
-class CenterCAT(Center):
     """docstring for Center
 
     Attributes:
@@ -43,20 +28,11 @@ class CenterCAT(Center):
         persons: list of Person
     """
 
-    def __init__(self, file_dir, filenames='origin.csv',
-                 use_nii=False, use_csv=True, 
-                 use_personal_info=False, use_xml=True,
-                 nii_prefix='mri/wm{}.nii',
-                 csv_prefix='csv/{}.csv',
-                 personal_info_prefix='personal_info/{}.csv',
-                 xml_prefix='report/cat_{}.xml'):
+    def __init__(self, file_dir, filenames='origin.csv'):
         name = file_dir[file_dir.rfind('/')+1:]
-        super(CenterCAT, self).__init__(file_dir, name, filenames,
-                                        use_nii, use_csv, 
-                                        use_personal_info, use_xml,
-                                        nii_prefix,
-                                        csv_prefix, personal_info_prefix, xml_prefix)
-        self.use_personal_info = use_personal_info
+        self.file_dir = file_dir
+        self.name = name
+        self.filenames = filenames
         self.persons = self.load_persons()
 
     def load_persons(self):
@@ -70,21 +46,10 @@ class CenterCAT(Center):
         #get person's filename in txt file
         df = pd.read_csv(csv_path, index_col=0)
         for index, value in df.iterrows():
-            try:
-                filename = index
-                label = value['label']
-                _person = person.PersonCAT(self.file_dir, filename, label,
-                                            use_nii=self.use_nii,
-                                            use_csv=self.use_csv,
-                                            use_personal_info=self.use_personal_info,
-                                            use_xml=self.use_xml,
-                                            nii_prefix=self.nii_prefix,
-                                            csv_prefix=self.csv_prefix,
-                                            personal_info_prefix=self.personal_info_prefix,
-                                            xml_prefix=self.xml_prefix)
-                persons.append(_person)
-            except FileNotFoundError:
-                print('File {}/{} Not Found'.format(self.file_dir, filename))
+            filename = index
+            label = value['label']
+            _person = Person(filename, label)
+            persons.append(_person)
         return persons
 
     def save_labels(self, filename):
@@ -104,10 +69,112 @@ class CenterCAT(Center):
         """
         tmp = []
         if self.persons:
-            for _person in self.persons:
-                if _person.label == label:
-                    tmp.append(_person)
+            for person in self.persons:
+                if person.label == label:
+                    tmp.append(person)
         return tmp
 
     def create_dir(self, dir_name):
         os.mkdir(os.path.join(self.file_dir, dir_name))
+
+    def create_cortical_thickness_csv(self, persons=None,
+                                      cat_roi_prefix='label/catROIs_{}.xml',
+                                      ct_csv_prefix='cortical_thickness/{}.csv'):
+        if persons is None:
+            persons = self.persons
+        for person in persons:
+            xml_path = os.path.join(self.file_dir,
+                                    cat_roi_prefix.format(person.filename))
+            if not os.path.exists(xml_path):
+                print('No catROIs file:{}:{}'.format(self.name,person.filename))
+                continue
+            csv_path = os.path.join(self.file_dir,
+                                    ct_csv_prefix.format(person.filename))
+            report = ET.parse(xml_path)
+            root = report.getroot()
+            names = root.findall('./aparc_BN_Atlas/names')
+
+            thickness = root.find('./aparc_BN_Atlas/data/thickness')
+            thickness = thickness.text.replace(' ', ',')
+            thickness = thickness.replace('NaN', '-1')
+            
+            thickness_list = ast.literal_eval(thickness)
+
+            with open(csv_path, 'w', newline='') as file:
+                fieldnames = ['ID', 'CT']
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                for (item, thickness) in zip(names[0].findall('item'), thickness_list):
+                    if item.text[0].lower() == item.text[-1].lower():
+                        writer.writerow({'ID': item.text, 'CT': thickness})
+
+    def get_nii_pathes(self, persons=None, nii_prefix='mri/wm{}.nii'):
+        pathes = []
+        labels = []
+        if persons is None:
+            persons = self.persons
+        for person in persons:
+            pathes.append(os.path.join(self.file_dir,
+                          nii_prefix.format(person.filename)))
+            labels.append(person.label)
+        pathes = np.asarray(pathes)
+        labels = np.asarray(labels)
+        return pathes, labels
+
+    def get_tivs_cgws(self, persons=None, cat_prefix='report/cat_{}.xml'):
+        features = []
+        labels = []
+        if persons is None:
+            persons = self.persons
+        for person in persons:
+            xml_path = os.path.join(self.file_dir,
+                                    cat_prefix.format(person.filename))
+            report = ET.parse(xml_path)
+            root = report.getroot()
+            vol_tiv = root.findall('./subjectmeasures/vol_TIV')[0].text
+            cgw = root.findall('./subjectmeasures/vol_abs_CGW')
+            tmp = [float(i) for i in cgw[0].text.replace('[', '').replace(']', '').split()]
+            tmp.insert(0, float(vol_tiv))
+            
+            features.append(tmp[0:4])
+            labels.append(person.label)
+        features = np.asarray(features)
+        labels = np.asarray(labels)
+        return features, labels
+
+    def get_presonal_info_values(self, persons=None,
+                                personal_info_prefix='personal_info/{}.csv'):
+        features = []
+        labels = []
+        if persons is None:
+            persons = self.persons
+        for person in persons:
+            csv_path = os.path.join(self.file_dir,
+                                    personal_info_prefix.format(person.filename))
+            df = pd.read_csv(csv_path)
+            values = df.to_numpy().flatten()
+            if len(values) == 3:
+                values = np.append(values, np.nan)
+            features.append(values)
+            labels.append(person.label)
+        features = np.asarray(features)
+        labels = np.asarray(labels)
+        return features, labels
+
+    def get_csv_values(self, persons=None, prefix='csv/{}.csv', flatten=False):
+        features = []
+        labels = []
+        if persons is None:
+            persons = self.persons
+        for person in persons:
+            csv_path = os.path.join(self.file_dir,
+                                    prefix.format(person.filename))
+            df = pd.read_csv(csv_path, index_col=0)
+            if flatten:
+                features.append(df.to_numpy().flatten())
+            else:
+                features.append(df.to_numpy())
+            labels.append(person.label)
+        features = np.stack(features)
+        labels = np.stack(labels)
+        return features, labels

@@ -18,89 +18,33 @@ def load_masks(mask_dir='./data/DMN_region'):
     """
     return mask.Masks(mask_dir)
 
-def load_centers_mcad(filenames='origin.csv', use_nii=False, use_csv=False,
-                      use_personal_info=False, use_xml=False,
-                      nii_prefix='mri/{}.nii',
-                      personal_info_prefix='personal_info/{}.csv',
-                      csv_prefix='csv/{}.csv'):
-    """get list of MCAD's Center
-    Args:
-        use_nii: bool, whether to load nii
-        use_gm: bool, whether to load segmented gm nii
-        use_wm: bool, whether to load segmented gm nii
-        use_csv: bool, whether to load csv
-        use_xml: bool, whether to load xml
-
-    Returns:
-        list of Center
-    """
+def load_centers(center_dir, filenames):
     centers = []
-    for i in range(1, 9):
-        center_path = './data/AD/MCAD/AD_S0{0}/AD_S0{0}_MPR'.format(i)
-        _center = center.CenterCAT(center_path, filenames,
-                                   use_nii=use_nii, use_csv=use_csv, 
-                                   use_personal_info=use_personal_info,
-                                   use_xml=use_xml,
-                                   nii_prefix=nii_prefix,
-                                   personal_info_prefix=personal_info_prefix,
-                                   csv_prefix=csv_prefix)
-        centers.append(_center)
-    return centers
-
-def load_centers_edsd(data_path='./data/AD/EDSD/EDSD_T1',
-                      filenames='origin.csv',
-                      use_nii=False, use_csv=False,
-                      use_personal_info=False, use_xml=False,
-                      nii_prefix='mri/{}.nii',
-                      personal_info_prefix='personal_info/{}.csv',
-                      csv_prefix='csv/{}.csv'):
-    """get list of EDSD's Center
-    Args:
-        use_nii: bool, whether to load nii
-        use_csv: bool, whether to load csv
-        use_xml: bool, whether to load xml
-
-    Returns:
-        list of Center
-    """
-    centers = []
-    center_names = os.listdir(data_path)
+    center_names = os.listdir(center_dir)
 
     for center_name in center_names:
-        center_path = os.path.join(data_path, center_name)
-        _center = center.CenterCAT(center_path, filenames,
-                                   use_nii=use_nii, use_csv=use_csv,
-                                   use_personal_info=use_personal_info,
-                                   use_xml=use_xml,
-                                   nii_prefix=nii_prefix,
-                                   personal_info_prefix=personal_info_prefix,
-                                   csv_prefix=csv_prefix)
+        center_path = os.path.join(center_dir, center_name)
+        _center = center.Center(center_path, filenames)
         centers.append(_center)
     return centers
 
-def load_centers_adni(data_path='./data/AD/ADNI',
-                      filenames='origin.csv',
-                      use_nii=False, use_csv=False,
-                      use_personal_info=False, use_xml=False,
-                      nii_prefix='mri/mwp1_{}.nii',
-                      personal_info_prefix='personal_info/{}.csv',
-                      csv_prefix='csv/{}.csv', 
-                      xml_prefix='report/mwp1_{}.xml'):
-    centers = []
-    center_names = os.listdir(data_path)
-
-    for center_name in center_names:
-        center_path = os.path.join(data_path, center_name)
-        _center = center.CenterCAT(center_path, filenames,
-                                   use_nii=use_nii, use_csv=use_csv,
-                                   use_personal_info=use_personal_info,
-                                   use_xml=use_xml,
-                                   nii_prefix=nii_prefix,
-                                   personal_info_prefix=personal_info_prefix,
-                                   csv_prefix=csv_prefix,
-                                   xml_prefix=xml_prefix)
-        centers.append(_center)
+def load_centers_mcad(filenames='origin.csv'):
+    center_dir = './data/AD/MCAD'
+    centers = load_centers(center_dir, filenames)
     return centers
 
-if __name__ == "__main__":
-    pass
+def load_centers_edsd(filenames='origin.csv'):
+    center_dir = './data/AD/EDSD'
+    centers = load_centers(center_dir, filenames)
+    return centers
+
+def load_centers_adni(filenames='origin.csv'):
+    center_dir = './data/AD/ADNI'
+    centers = load_centers(center_dir, filenames)
+    return centers
+
+def load_centers_all(filenames='origin.csv'):
+    centers_mcad = load_centers_mcad(filenames)
+    centers_edsd = load_centers_edsd(filenames)
+    centers_adni = load_centers_adni(filenames)
+    return centers_mcad + centers_edsd + centers_adni
