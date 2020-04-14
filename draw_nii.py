@@ -14,15 +14,8 @@ for center in centers:
             nii_path = os.path.join(file_path, filename)
             nii = nib.load(nii_path)
             title = center + filename
-            #plotting.plot_stat_map(nii, title=filename, vmax=0,vmin=-0.5,
-            #                        cmap=matplotlib.cm.get_cmap('hot'))
-            #plotting.plot_glass_brain(nii, title=title,
-                                      #threshold=0.8, colorbar=True,
-                                      #output_file=os.path.join(file_path, filename)[:-3],
-                                      #annotate=True, plot_abs=False)
-            html_view = plotting.view_img_on_surf(nii, threshold=0.2)
-            html_path = nii_path[:-3]+'html'
-            html_view.save_as_html(html_path)
+            plotting.plot_stat_map(nii, title=filename,
+                                    cmap=matplotlib.cm.get_cmap('hot'))
 
 #%%
 from nilearn import plotting
@@ -94,4 +87,19 @@ for center in centers:
             plotting.plot_stat_map(es, title=filename)
 
 # %%
- 
+from nilearn import plotting
+import nibabel as nib
+import matplotlib
+path = './results/meta'
+tests = os.listdir(path)
+for test in tests:
+    voxel_path = os.path.join(path, test, 'voxel')
+    f = os.path.join(voxel_path,'es_bon.nii')
+    
+    es =  nib.load(f)
+    plotting.plot_stat_map(es, title=test,
+                           cmap=matplotlib.cm.get_cmap('hot'))
+    html_view = plotting.view_img(es)
+    html_path = f[:-3]+'html'
+    html_view.save_as_html(html_path)
+# %%
