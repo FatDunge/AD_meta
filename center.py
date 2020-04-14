@@ -7,8 +7,15 @@ import os
 import re
 import xml.etree.ElementTree as ET
 
+import nibabel as nib
 import numpy as np
 import pandas as pd
+
+def load_array(path, dtype=np.float32):
+    nii = nib.load(path)
+    array = np.asarray(nii.dataobj, dtype=dtype)
+    array = np.nan_to_num(array)
+    return array
 
 class Person(object):
     def __init__(self, filename, label):
@@ -105,8 +112,11 @@ class Center(object):
                 writer = csv.DictWriter(file, fieldnames=fieldnames)
                 writer.writeheader()
                 for (item, thickness) in zip(names[0].findall('item'), thickness_list):
-                    if item.text[0].lower() == item.text[-1].lower():
-                        writer.writerow({'ID': item.text, 'CT': thickness})
+                    name = item.text
+                    if name[0].lower() == name[-1].lower():
+                        if '/' in name:
+                            name = name.replace('/', '-')
+                        writer.writerow({'ID': name, 'CT': thickness})
 
     def get_nii_pathes(self, persons=None, nii_prefix='mri/wm{}.nii'):
         pathes = []
@@ -117,7 +127,6 @@ class Center(object):
             pathes.append(os.path.join(self.file_dir,
                           nii_prefix.format(person.filename)))
             labels.append(person.label)
-        pathes = np.asarray(pathes)
         labels = np.asarray(labels)
         return pathes, labels
 
@@ -175,6 +184,16 @@ class Center(object):
             else:
                 features.append(df.to_numpy())
             labels.append(person.label)
+            ids = df.index.tolist()
         features = np.stack(features)
         labels = np.stack(labels)
-        return features, labels
+        return features, labels, ids
+
+    def load_label_msn(self, label, _dir='mri_smoothed'):
+        path = os.path.join(self.file_dir, _dir, '{}'.format(label))
+        mean_path = os.path.join(path, 'mean.nii')
+        std_path = os.path.join(path, 'std.nii')
+        mean = load_array(mean_path)
+        std = load_array(std_path)
+        count = len(self.get_by_label(label))
+        return mean, std, count
