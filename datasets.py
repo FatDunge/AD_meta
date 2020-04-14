@@ -8,16 +8,6 @@ import os
 import center
 import mask
 
-def load_masks(mask_dir='./data/DMN_region'):
-    """load masks from disk
-    Args:
-        mask_dir: string, dir of masks
-
-    Returns:
-        Masks instance, details in mask.py
-    """
-    return mask.Masks(mask_dir)
-
 def load_centers(center_dir, filenames):
     centers = []
     center_names = os.listdir(center_dir)
