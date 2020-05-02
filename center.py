@@ -10,6 +10,8 @@ import xml.etree.ElementTree as ET
 import nibabel as nib
 import numpy as np
 import pandas as pd
+from nibabel.freesurfer.io import read_morph_data
+from nibabel import nifti1
 
 def load_array(path, dtype=np.float32):
     nii = nib.load(path)
@@ -84,9 +86,9 @@ class Center(object):
     def create_dir(self, dir_name):
         os.mkdir(os.path.join(self.file_dir, dir_name))
 
-    def create_cortical_thickness_csv(self, persons=None,
-                                      cat_roi_prefix='label/catROIs_{}.xml',
-                                      ct_csv_prefix='cortical_thickness/{}.csv'):
+    def create_rct_csv(self, persons=None,
+                        cat_roi_prefix='label/catROIs_{}.xml',
+                        ct_csv_prefix='roi_ct/{}.csv'):
         if persons is None:
             persons = self.persons
         for person in persons:
@@ -130,6 +132,11 @@ class Center(object):
         labels = np.asarray(labels)
         return pathes, labels
 
+    def save_nii(self, person, nii, nii_prefix='mri_smoothed_removed/{}.nii'):
+        path = os.path.join(self.file_dir,
+                            nii_prefix.format(person.filename))
+        nifti1.save(nii, path)
+
     def get_tivs_cgws(self, persons=None, cat_prefix='report/cat_{}.xml'):
         features = []
         labels = []
@@ -151,8 +158,26 @@ class Center(object):
         labels = np.asarray(labels)
         return features, labels
 
+    def get_cortical_thickness(self, persons=None,
+                               surf_prefix='surf/s15.mesh.thickness.resampled_32k.{}.gii'):
+        features = []
+        labels = []
+        if persons is None:
+            persons = self.persons
+        for person in persons:
+            ct_path = os.path.join(self.file_dir,
+                                   surf_prefix.format(person.filename))
+            ct_gii = nib.load(ct_path)
+            ct_darray = ct_gii.get_arrays_from_intent(0)[0]
+            features.append(ct_darray.data)
+            labels.append(person.label)
+        features = np.asarray(features)
+        labels = np.asarray(labels)
+        return features, labels
+
     def get_presonal_info_values(self, persons=None,
                                 personal_info_prefix='personal_info/{}.csv'):
+        # get person's male, female, age, MMSE
         features = []
         labels = []
         if persons is None:
@@ -170,7 +195,7 @@ class Center(object):
         labels = np.asarray(labels)
         return features, labels
 
-    def get_csv_values(self, persons=None, prefix='csv/{}.csv', flatten=False):
+    def get_csv_values(self, persons=None, prefix='roi_gmv/{}.csv', flatten=False):
         features = []
         labels = []
         if persons is None:
@@ -188,6 +213,20 @@ class Center(object):
         features = np.stack(features)
         labels = np.stack(labels)
         return features, labels, ids
+    
+    def get_csv_df(self, persons=None, prefix='roi_gmv/{}.csv'):
+        dfs = []
+        labels = []
+        if persons is None:
+            persons = self.persons
+        for person in persons:
+            csv_path = os.path.join(self.file_dir,
+                                    prefix.format(person.filename))
+            df = pd.read_csv(csv_path, index_col=0)
+            dfs.append(df)
+            labels.append(person.label)
+        labels = np.stack(labels)
+        return dfs, labels
 
     def load_label_msn(self, label, _dir='mri_smoothed'):
         path = os.path.join(self.file_dir, _dir, '{}'.format(label))
