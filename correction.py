@@ -10,7 +10,7 @@ def voxelwise_correction(array, p_array, voxel_count, thres=0.05):
     thresed_p = p_array < thres / voxel_count
     return np.multiply(array, thresed_p)
 
-mask_path = './data/mask/grey_matter_smoothed_005.nii'
+mask_path = './data/mask/rBN_Atlas_246_1mm.nii'
 mask_nii = nib.load(mask_path)
 mask = np.asarray(mask_nii.dataobj)
 voxel_count = np.size(mask[mask!=0])
