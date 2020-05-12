@@ -33,8 +33,16 @@ def load_centers_adni(filenames='origin.csv'):
     centers = load_centers(center_dir, filenames)
     return centers
 
-def load_centers_all(filenames='origin.csv'):
+def load_centers_adni_merge(filenames='origin.csv'):
+    center_dir = './data/AD/ADNI_merge'
+    centers = load_centers(center_dir, filenames)
+    return centers
+
+def load_centers_all(filenames='origin.csv', adni_merge=True):
     centers_mcad = load_centers_mcad(filenames)
     centers_edsd = load_centers_edsd(filenames)
-    centers_adni = load_centers_adni(filenames)
+    if adni_merge:
+        centers_adni = load_centers_adni_merge(filenames)
+    else:
+        centers_adni = load_centers_adni(filenames)
     return centers_mcad + centers_edsd + centers_adni
