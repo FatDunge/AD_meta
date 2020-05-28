@@ -86,11 +86,15 @@ class Center(object):
     def create_dir(self, dir_name):
         os.mkdir(os.path.join(self.file_dir, dir_name))
 
-    def create_rct_csv(self, persons=None,
+    def create_rct_csv(self, label=None,
                         cat_roi_prefix='label/catROIs_{}.xml',
                         ct_csv_prefix='roi_ct/{}.csv'):
-        if persons is None:
+        if label is None:
             persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
         for person in persons:
             xml_path = os.path.join(self.file_dir,
                                     cat_roi_prefix.format(person.filename))
@@ -120,11 +124,15 @@ class Center(object):
                             name = name.replace('/', '-')
                         writer.writerow({'ID': name, 'CT': thickness})
 
-    def get_nii_pathes(self, persons=None, nii_prefix='mri/wm{}.nii'):
+    def get_nii_pathes(self, label=None, nii_prefix='mri/wm{}.nii'):
         pathes = []
         labels = []
-        if persons is None:
+        if label is None:
             persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
         for person in persons:
             pathes.append(os.path.join(self.file_dir,
                           nii_prefix.format(person.filename)))
@@ -137,11 +145,15 @@ class Center(object):
                             nii_prefix.format(person.filename))
         nifti1.save(nii, path)
 
-    def get_tivs_cgws(self, persons=None, cat_prefix='report/cat_{}.xml'):
+    def get_tivs_cgws(self, label=None, cat_prefix='report/cat_{}.xml'):
         features = []
         labels = []
-        if persons is None:
+        if label is None:
             persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
         for person in persons:
             xml_path = os.path.join(self.file_dir,
                                     cat_prefix.format(person.filename))
@@ -158,12 +170,48 @@ class Center(object):
         labels = np.asarray(labels)
         return features, labels
 
-    def get_cortical_thickness(self, persons=None,
+    def get_tivs(self, label=None, cat_prefix='report/cat_{}.xml'):
+        features, labels = self.get_tivs_cgws(label, cat_prefix)
+        if labels is not None:
+            tivs = features[:,0]
+        else:
+            tivs = None
+        return tivs, labels
+
+    def get_csfs(self, label=None, cat_prefix='report/cat_{}.xml'):
+        features, labels = self.get_tivs_cgws(label, cat_prefix)
+        if labels is not None:
+            csfs = features[:,1]
+        else:
+            csfs = None
+        return csfs, labels
+
+    def get_gmvs(self, label=None, cat_prefix='report/cat_{}.xml'):
+        features, labels = self.get_tivs_cgws(label, cat_prefix)
+        if labels is not None:
+            gmvs = features[:,2]
+        else:
+            gmvs = None
+        return gmvs, labels
+
+    def get_wmvs(self, label=None, cat_prefix='report/cat_{}.xml'):
+        features, labels = self.get_tivs_cgws(label, cat_prefix)
+        if labels is not None:
+            wmvs = features[:,3]
+        else:
+            wmvs = None
+        return wmvs, labels
+
+    def get_cortical_thickness(self, label=None,
                                surf_prefix='surf/s15.mesh.thickness.resampled_32k.{}.gii'):
         features = []
         labels = []
-        if persons is None:
+        if label is None:
             persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
         for person in persons:
             ct_path = os.path.join(self.file_dir,
                                    surf_prefix.format(person.filename))
@@ -174,14 +222,37 @@ class Center(object):
         features = np.asarray(features)
         labels = np.asarray(labels)
         return features, labels
+    
+    def get_cortical_thickness_pathes(self, label=None,
+                                      surf_prefix='surf/s15.mesh.thickness.resampled_32k.{}.gii'):
+        ct_pathes = []
+        labels = []
+        if label is None:
+            persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
+        for person in persons:
+            ct_path = os.path.join(self.file_dir,
+                                   surf_prefix.format(person.filename))
+            ct_pathes.append(ct_path)
+            labels.append(person.label)
+        ct_pathes = np.asarray(ct_pathes)
+        labels = np.asarray(labels)
+        return ct_pathes, labels
 
-    def get_presonal_info_values(self, persons=None,
+    def get_presonal_info_values(self, label=None,
                                 personal_info_prefix='personal_info/{}.csv'):
         # get person's male, female, age, MMSE
         features = []
         labels = []
-        if persons is None:
+        if label is None:
             persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
         for person in persons:
             csv_path = os.path.join(self.file_dir,
                                     personal_info_prefix.format(person.filename))
@@ -189,17 +260,50 @@ class Center(object):
             values = df.to_numpy().flatten()
             if len(values) == 3:
                 values = np.append(values, np.nan)
+            if np.isnan(values[-1]):
+                print(self.file_dir, person.filename)
             features.append(values)
             labels.append(person.label)
         features = np.asarray(features)
         labels = np.asarray(labels)
         return features, labels
+    
+    def get_ages(self, label=None,
+                 personal_info_prefix='personal_info/{}.csv'):
+        features, labels = self.get_presonal_info_values(label, personal_info_prefix)
+        if labels is not None:
+            ages = features[:,0]
+        else:
+            ages = None
+        return ages, labels
 
-    def get_csv_values(self, persons=None, prefix='roi_gmv/{}.csv', flatten=False):
+    def get_genders(self, label=None,
+                    personal_info_prefix='personal_info/{}.csv'):
+        features, labels = self.get_presonal_info_values(label, personal_info_prefix)
+        if labels is not None:
+            genders = features[:,1]
+        else:
+            genders = None
+        return genders, labels
+
+    def get_MMSEs(self, label=None,
+                 personal_info_prefix='personal_info/{}.csv'):
+        features, labels = self.get_presonal_info_values(label, personal_info_prefix)
+        if labels is not None:
+            MMSEs = features[:,-1]
+        else:
+            MMSEs = None
+        return MMSEs, labels
+
+    def get_csv_values(self, label=None, prefix='roi_gmv/{}.csv', flatten=False):
         features = []
         labels = []
-        if persons is None:
+        if label is None:
             persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None, None
         for person in persons:
             csv_path = os.path.join(self.file_dir,
                                     prefix.format(person.filename))
@@ -214,11 +318,15 @@ class Center(object):
         labels = np.stack(labels)
         return features, labels, ids
     
-    def get_csv_df(self, persons=None, prefix='roi_gmv/{}.csv'):
+    def get_csv_df(self, label=None, prefix='roi_gmv/{}.csv'):
         dfs = []
         labels = []
-        if persons is None:
+        if label is None:
             persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
         for person in persons:
             csv_path = os.path.join(self.file_dir,
                                     prefix.format(person.filename))
@@ -228,11 +336,36 @@ class Center(object):
         labels = np.stack(labels)
         return dfs, labels
 
-    def load_label_msn(self, label, _dir='mri_smoothed'):
+    def get_resampled_gii_pathes(self, label, prefix='surf/s15.mesh.thickness.resampled_32k.removed.{}.gii'):
+        pathes = []
+        labels = []
+        if label is None:
+            persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
+        for person in persons:
+            pathes.append(os.path.join(self.file_dir,
+                          prefix.format(person.filename)))
+            labels.append(person.label)
+        labels = np.asarray(labels)
+        return pathes, labels
+
+    def load_msn_nii_array(self, label, _dir='mri_smoothed'):
         path = os.path.join(self.file_dir, _dir, '{}'.format(label))
         mean_path = os.path.join(path, 'mean.nii')
         std_path = os.path.join(path, 'std.nii')
         mean = load_array(mean_path)
         std = load_array(std_path)
+        count = len(self.get_by_label(label))
+        return mean, std, count
+
+    def load_msn_array(self, label, _dir='surf'):
+        path = os.path.join(self.file_dir, _dir, '{}'.format(label))
+        mean_path = os.path.join(path, 'mean.npy')
+        std_path = os.path.join(path, 'std.npy')
+        mean = np.load(mean_path)
+        std = np.load(std_path)
         count = len(self.get_by_label(label))
         return mean, std, count
