@@ -74,6 +74,7 @@ for center in centers:
             nii = nib.Nifti1Image(image, onii.affine, header)
             center.save_nii(person, nii)
 #%%
+# Remove Nii using linear regression
 from sklearn.linear_model import HuberRegressor
 import time
 nii_prefix = 'mri_smoothed/{}.nii'
@@ -123,12 +124,57 @@ while end < len(indexss):
     et = time.time()
     print('Regression time:{}'.format(et-st))
     st = et
+
+#%%
+# Remove Resampled gii using linear regression
+from sklearn.linear_model import HuberRegressor
+import time
+
+regs = []
+st = time.time()
+
+x = None
+print('loading x')
+for center in centers:
+    if x is None:
+        x = create_x(center)
+    else:
+        x = np.concatenate((x, create_x(center))) 
+et = time.time()
+print('x time: {}'.format(et-st))
+st = et
+
+ys = []
+for center in centers:
+    print('loading y')
+    pathes, *_ = center.get_cortical_thickness_pathes()
+    for path in pathes:
+        ct_gii = nib.load(path)
+        ct_darray = ct_gii.get_arrays_from_intent(0)[0]
+        ys.append(ct_darray.data.flatten())
+    et = time.time()
+    print('y time: {}'.format(et-st))
+    st = et
+ys = np.asarray(ys)
+ys = np.nan_to_num(ys)
+print('Regression')
+for y in ys.T:
+    reg = HuberRegressor().fit(x, y)
+    regs.append(reg)
+et = time.time()
+print('Regression time:{}'.format(et-st))
+st = et
 #%%
 import pickle
-output = open('./data/regs.pkl', 'wb')
+output = open('./data/regs_ct.pkl', 'wb')
 pickle.dump(regs, output)
 output.close()
 
+#%%
+import pickle
+inputs = open('./data/regs_ct.pkl', 'rb')
+regs = pickle.load(inputs)
+inputs.close()
 #%%
 import pickle
 tmp = [reg.coef_ for reg in regs]
@@ -139,6 +185,7 @@ output.close()
 tmp = np.asarray(tmp)
 tmp[tmp==0]
 #%%
+# Process and save removed Nii(Linear regression)
 for center in centers:
     pathes, *_ = center.get_nii_pathes(nii_prefix=nii_prefix)
     x = create_x(center)
@@ -154,6 +201,30 @@ for center in centers:
         image = np.reshape(image, (181, 217, 181))
         nii = nib.Nifti1Image(image, onii.affine, header)
         center.save_nii(person, nii)
+
+#%%
+from nibabel.gifti.gifti import GiftiDataArray,GiftiImage
+
+for center in centers:
+    pathes, *_ = center.get_cortical_thickness_pathes()
+    x = create_x(center)
+    for xi,path in zip(x, pathes):
+        ct_gii = nib.load(path)
+        newpath = path.replace('resampled_32k', 'resampled_32k.removed')
+        ct_darray = ct_gii.get_arrays_from_intent(0)[0]
+        data = ct_darray.data
+        shape = data.shape
+        data = np.nan_to_num(data)
+        data = data.flatten()
+        new_data = np.zeros_like(data)
+        index = data!=np.nan
+        for (reg,i) in zip(regs,index):
+            new_data[i] = data[i] - np.dot(xi[:4], reg.coef_[:4])
+        new_data = np.reshape(new_data, newshape=shape)
+        gdarray = GiftiDataArray.from_array(new_data, intent=0)
+        ct_gii.remove_gifti_data_array_by_intent(0)
+        ct_gii.add_gifti_data_array(gdarray)
+        nib.save(ct_gii, newpath)
     
 #%%
 nii_prefix = 'mri_smoothed/{}.nii'

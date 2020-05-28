@@ -17,6 +17,7 @@ voxel_count = np.size(mask[mask!=0])
 #%%
 path = './results/meta'
 tests = os.listdir(path)
+ps = [0.05, 0.01, 0.001]
 for test in tests:
     voxel_path = os.path.join(path, test, 'voxel')
     es_path = os.path.join(voxel_path, 'es.nii')
@@ -27,11 +28,65 @@ for test in tests:
     p =  nib.load(p_path)
     p_array = np.asarray(p.dataobj)
 
-    corrected_array = voxelwise_correction(es_array, p_array, voxel_count)
-    affine = es.affine
-    header = es.header
-    corrected_niis = nib.Nifti1Image(corrected_array, affine, header)
-    new_f = os.path.join(voxel_path,'es_bon.nii')
-    nifti1.save(corrected_niis, new_f)
+    for p in ps:
+        corrected_array = voxelwise_correction(es_array, p_array, voxel_count, thres=p)
+        affine = es.affine
+        header = es.header
+        corrected_niis = nib.Nifti1Image(corrected_array, affine, header)
+        new_f = os.path.join(voxel_path,'es_bon_{}.nii'.format(str(p)[2:]))
+        print(new_f)
+        print(len(corrected_array[corrected_array!=0]))
+        nifti1.save(corrected_niis, new_f)
+
+# %%
+from nilearn import plotting
+import nibabel as nib
+import matplotlib
+import os
+path = './results/meta'
+tests = os.listdir(path)
+for test in tests:
+    voxel_path = os.path.join(path, test, 'voxel')
+    fs = os.listdir(voxel_path)
+    for f in fs:
+        if 'es_bon' in f and '.nii' in f:
+            f = os.path.join(voxel_path, f)
+            
+            es =  nib.load(f)
+            plotting.plot_stat_map(es, title=test,
+                                   cmap=matplotlib.cm.get_cmap('RdGy'),)
+            html_view = plotting.view_img(es, 
+                                          cmap=matplotlib.cm.get_cmap('RdGy'),
+                                          )
+            html_path = f[:-3]+'html'
+            html_view.save_as_html(html_path)
+
+# %%
+# gii correction
+from nilearn.surface import load_surf_data
+from nibabel.gifti.gifti import GiftiDataArray
+import numpy as np
+path = './results/meta'
+tests = os.listdir(path)
+ps = [0.05, 0.01, 0.001]
+for test in tests:
+    voxel_path = os.path.join(path, test, 'surf')
+    es_path = os.path.join(voxel_path, 'es.gii')
+    p_path =  os.path.join(voxel_path, 'p.gii')
+    
+    es_array = load_surf_data(es_path)[-1]
+    p_array = load_surf_data(p_path)[-1]
+
+    voxel_count = np.size(p_array)
+
+    for p in ps:
+        corrected_array = voxelwise_correction(es_array, p_array, voxel_count, thres=p)
+        new_f = os.path.join(voxel_path,'es_bon_{}.gii'.format(str(p)[2:]))
+        ct_gii = nib.load(es_path)
+        gdarray = GiftiDataArray.from_array(corrected_array, intent=0)
+        ct_gii.add_gifti_data_array(gdarray)
+        nib.save(ct_gii, new_f)
+        
+
 
 # %%
