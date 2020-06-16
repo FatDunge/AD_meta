@@ -7,12 +7,6 @@ import csv
 from meta_analysis import utils
 from meta_analysis.main import csv_meta_analysis
 
-filenames = 'origin.csv'
-centers = datasets.load_centers_all(filenames=filenames)
-out_path = './data/meta_csv'
-label_pairs = [(2,0), (2,1), (1,0)]
-csv_prefixs = ['roi_gmv_removed/', 'roi_ct_removed/']
-
 def sort_models(models, filenames, orderby='es', descend=True):
     if orderby == 'es':
         list1 = [model.total_effect_size for model in models]
@@ -20,14 +14,23 @@ def sort_models(models, filenames, orderby='es', descend=True):
     return list1, models, filenames
 
 def bon_cor(models, filenames, thres=0.05):
-    after = {}
+    passed = {}
+    not_passed = {}
     n = len(models)
     for model, filename in zip(models, filenames):
         if model.p * n <= thres:
-            after[filename] = model
-    return after
+            passed[filename] = model
+        else:
+            not_passed[filename] = model
+    return passed, not_passed 
 #%%
 # create csv for meta analysis
+filenames = 'origin.csv'
+centers = datasets.load_centers_all(filenames=filenames)
+out_path = './data/meta_csv'
+label_pairs = [(2,0), (2,1), (1,0)]
+csv_prefixs = ['roi_gmv_removed/', 'roi_ct_removed/']
+
 for label_pair in label_pairs:
     label_eg, label_cg = label_pair
     label_dir = os.path.join(out_path, '{}_{}'.format(label_eg, label_cg))
@@ -98,7 +101,7 @@ for label_pair in label_pairs:
                                     'n2': cn,})
 
 #%%
-thress = [0.05, 0.01, 0.001]
+thress = [0.001]
 for csv_prefix in csv_prefixs:
     for pair in label_pairs:
         csv_dir = './data/meta_csv/{}_{}/{}'.format(pair[0], pair[1], csv_prefix)
@@ -115,8 +118,8 @@ for csv_prefix in csv_prefixs:
             filenames.append(f[:-4])
 
         for thres in thress:
-            cor_model = bon_cor(models, filenames)
-            print('{}_{}:{}_{}:{}'.format(csv_prefix, thres,pair[0], pair[1], len(bon_cor(models, filenames, thres=thres))))
+            cor_model, not_passed = bon_cor(models, filenames, thres=thres)
+            print('{}_{}:{}_{}:{}'.format(csv_prefix, thres,pair[0], pair[1], len(cor_model)))
         
         list1, models, filenames = sort_models(models, filenames, descend=False)
         top = len(models)
@@ -127,7 +130,7 @@ for csv_prefix in csv_prefixs:
             model.plot_forest(title=filename, save_path=out_path, show=False)
             i += 1
         """
-        
+        """
         csv_path = os.path.join(out_dir, 'TOP{}.csv'.format(top))
         with open(csv_path, 'w', newline='') as file:
             fieldnames = ['name', 'es', 'se', 'll', 'ul', 'z','p']
@@ -141,8 +144,10 @@ for csv_prefix in csv_prefixs:
                   'ul':round(model.total_upper_limit,2),
                   'z':round(model.z, 2),
                   'p':'{:.2e}'.format(model.p)})
+        """
         
 # %%
+
 import nibabel as nib
 import pandas as pd
 import os
@@ -173,7 +178,7 @@ for pair in pairs:
             models.append(model)
             filenames.append(f[:-4])
 
-        cor_model = bon_cor(models, filenames, thres=p)
+        cor_model, _ = bon_cor(models, filenames, thres=p)
         ll = [i for i in range(1, 247)]
         for k, v in cor_model.items():
             _id = df.loc[k]['ID']
@@ -183,14 +188,7 @@ for pair in pairs:
             nii_array[nii_array==i] = 0
         path = os.path.join(out_dir, 'cor_{}.nii'.format(str(p).replace('.', '_')))
         r = utils.gen_nii(nii_array, nii, path)
-        plotting.plot_stat_map(r,
-                                cmap=cmap.get_cmap(),
-                                cut_coords=(30, -10,-10),
-                                output_file=path[:-3]+'png')
 
-        html_view = plotting.view_img(r)
-        html_path = path[:-3]+'html'
-        html_view.save_as_html(html_path)
 # %%
 import nilearn as nil
 from nilearn import surface
@@ -203,29 +201,23 @@ from nilearn import plotting
 from meta_analysis.main import csv_meta_analysis
 import numpy as np
 import cmap
+from nibabel.gifti.gifti import GiftiDataArray,GiftiImage
 
 pairs = [(2,0), (2,1),(1,0)]
-annots = ['lh.BN_Atlas.annot', 'rh.BN_Atlas.annot']
-surfs = ['lh.pial', 'rh.pial']
+annots = ['fsaverage.L.BN_Atlas.32k_fs_LR.label.gii', 'fsaverage.L.BN_Atlas.32k_fs_LR.label.gii']
+surfs = ['fsaverage.L.inflated.32k_fs_LR.surf.gii', 'fsaverage.R.inflated.32k_fs_LR.surf.gii']
+l_r = ['L', 'R']
 bgs = ['lh.sulc', 'rh.sulc']
 csv_path = './data/mask/cortical_id.csv'
 df = pd.read_csv(csv_path, index_col=0)
-label_dir = r'./data/mask/BN_Atlas_freesurfer/fsaverage/label/{}'
-surf_dir = r'./data/mask/BN_Atlas_freesurfer/fsaverage/surf/{}'
+label_dir = r'./data/mask/BN_Atlas_freesurfer/fsaverage/fsaverage_LR32k/{}'
 
-def bon_cor(models, filenames,alpha=0.001):
-    after = {}
-    n = len(models)
-    for model, filename in zip(models, filenames):
-        if model.p * n <= alpha:
-            after[filename] = model
-    return after
 for pair in pairs:
-    for annot, surf, bg in zip(annots, surfs, bgs):
+    for annot, surf, bg, lr in zip(annots, surfs, bgs, l_r):
         a = surface.load_surf_data(label_dir.format(annot))
         a = a.astype(np.float32)
-        b = surf_dir.format(surf)
-        g = surf_dir.format(bg)
+        b = label_dir.format(surf)
+        tmp_gii = nib.load(b)
 
         csv_dir = './data/meta_csv/{}_{}/roi_ct_removed'.format(pair[0], pair[1])
         out_dir = './results/meta/{}_{}/roi_ct_removed'.format(pair[0], pair[1])
@@ -240,43 +232,26 @@ for pair in pairs:
             models.append(model)
             filenames.append(f[:-4])
 
-        cor_model = bon_cor(models, filenames)
+        cor_model, _ = bon_cor(models, filenames)
         ll = np.unique(a).tolist()
+        
+        list1, models, filenames = sort_models(models, filenames)
+        p30_es = models[int(len(models)*0.3)].total_effect_size
 
         for k, v in cor_model.items():
             _id = np.float32(df.loc[k]['ID'])
-            a[a==_id] = v.total_effect_size
-            if _id in ll:
-                ll.remove(_id)
+            if v.total_effect_size <= p30_es:
+                a[a==_id] = v.total_effect_size
+                if _id in ll:
+                    ll.remove(_id)
         for i in ll:
             a[a==i] = 0
-        p = os.path.join(out_dir, '{}'.format(annot))
+        
+        gdarray = GiftiDataArray.from_array(a, intent=0)
+        tmp_gii.remove_gifti_data_array_by_intent(0)
+        tmp_gii.add_gifti_data_array(gdarray)
+        path = os.path.join(out_dir, 'es_{}_bon001_top30p.gii'.format(lr))
+        nib.save(tmp_gii, path)
 
-        plotting.plot_surf_stat_map(b, a,
-                            cmap=cmap.get_cmap(),
-                            view='lateral',
-                            bg_map=g,
-                            bg_on_data=True,
-                            darkness=0.2,
-                            output_file=p[:-4]+'_l.png')
-        plotting.plot_surf_stat_map(b, a,
-                        hemi='right',
-                        cmap=cmap.get_cmap(),
-                        view='lateral', 
-                        bg_map=g,
-                        bg_on_data=True,
-                        darkness=0.2,
-                        output_file=p[:-4]+'_r.png')
-
-        html_view = plotting.view_surf(b, a)
-        html_path = p+'.html'
-        html_view.save_as_html(html_path)
-
-
-# %%
-
-from nilearn import surface
-a = surface.load_surf_data(r'./data/mask/BN_Atlas_freesurfer/fsaverage/label/{}'.format('lh.BN_Atlas.annot'))
-a.shape
 
 # %%
