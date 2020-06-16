@@ -13,7 +13,6 @@ nii_prefix = _dir + '/{}.nii'
 _filenames = ['origin.csv']
 _labels = [['NC', 'MC', 'AD']]
 _pairs = [[(2,0), (1,0), (2, 1)]]
-thres = 10
 mask_path = './data/mask/rBN_Atlas_246_1mm.nii'
 output = r'./results/meta/{}_{}'
 
@@ -42,14 +41,14 @@ for filenames, labels, pairs in zip(_filenames, _labels, _pairs):
             for center in centers:
                 n1 = len(center.get_by_label(group1_label))
                 n2 = len(center.get_by_label(group2_label))
-                if n1 < thres or n2 < thres:
+                if n1 == 0 or n2 == 0:
                     continue
                 print('{}: e:{}, c:{}'.format(center.name, n1, n2), file=text_file)
                 group_mean_dict = {}
                 group_std_dict = {}
                 group_count_dict = {}
                 for label in [group1_label, group2_label]:
-                    m, s, n = center.load_label_msn(label, _dir=_dir)
+                    m, s, n = center.load_msn_nii(label, _dir=_dir)
                     group_mean_dict[label] = m
                     group_std_dict[label] = s
                     group_count_dict[label] = n
@@ -62,7 +61,7 @@ for filenames, labels, pairs in zip(_filenames, _labels, _pairs):
                                         center_mean_dict=center_mean_dict,
                                         center_std_dict=center_std_dict,
                                         center_count_dict=center_count_dict,
-                                        _mask=mask, dtype=np.float16)
+                                        _mask=mask, dtype=np.float32)
         
         result_names = ['es','var', 'se', 'll','ul','q','z','p']
         for result, name in zip(results, result_names):
@@ -79,28 +78,26 @@ from meta_analysis import utils
 import numpy as np
 nii_prefix = 'mri_smoothed_removed'
 filenames = 'origin.csv'
-labels = [0]
+labels = [0, 1, 2]
 mask_path = './data/mask/rBN_Atlas_246_1mm.nii'
-centers = datasets.load_centers_adni_merge(filenames=filenames)
+centers = datasets.load_centers_adni(filenames=filenames)
 mask_nii = nib.load(mask_path)
 mask = Mask(np.asarray(mask_nii.dataobj))
 for center in centers:
-    if len(center.persons) > 20:
-        for label in labels:
-            out_dir = os.path.join(center.file_dir, nii_prefix)
-            if not os.path.isdir(out_dir):
-                os.mkdir(out_dir)
-            out_dir = os.path.join(out_dir, '{}'.format(label))
-            if not os.path.isdir(out_dir):
-                os.mkdir(out_dir)
-            group = center.get_by_label(label)
-            group1_data, _ = center.get_nii_pathes(persons=group, nii_prefix=nii_prefix+'/{}.nii')
-            datas = utils.load_arrays(group1_data, dtype=np.float16)
-            mean, std, count = utils.cal_mean_std_n(datas)
-            mean_path = os.path.join(out_dir, 'mean')
-            std_path = os.path.join(out_dir, 'std')
-            utils.gen_nii(mean, mask_nii, mean_path)
-            utils.gen_nii(std, mask_nii, std_path)
+    for label in labels:
+        out_dir = os.path.join(center.file_dir, nii_prefix)
+        if not os.path.isdir(out_dir):
+            os.mkdir(out_dir)
+        out_dir = os.path.join(out_dir, '{}'.format(label))
+        if not os.path.isdir(out_dir):
+            os.mkdir(out_dir)
+        group1_pathes, _ = center.get_nii_pathes(label=label, nii_prefix=nii_prefix+'/{}.nii')
+        datas = utils.load_arrays(group1_pathes, dtype=np.float16)
+        mean, std, count = utils.cal_mean_std_n(datas)
+        mean_path = os.path.join(out_dir, 'mean')
+        std_path = os.path.join(out_dir, 'std')
+        utils.gen_nii(mean, mask_nii, mean_path)
+        utils.gen_nii(std, mask_nii, std_path)
 
 #%%
 # Generate mean, std nii
@@ -114,7 +111,7 @@ nii_prefix = 'mri_smoothed_removed'
 filenames = 'origin.csv'
 labels = [0, 1, 2]
 mask_path = './data/mask/rBN_Atlas_246_1mm.nii'
-centers = datasets.load_centers_adni_merge(filenames=filenames)
+centers = datasets.load_centers_adni(filenames=filenames)
 mask_nii = nib.load(mask_path)
 
 mask = np.ones(shape=(181*217*181))
@@ -140,8 +137,7 @@ for center in centers:
         if not os.path.isdir(out_dir):
             os.mkdir(out_dir)
 
-        group = center.get_by_label(label)
-        group_pathes, _ = center.get_nii_pathes(persons=group, nii_prefix=nii_prefix+'/{}.nii')
+        group_pathes, _ = center.get_nii_pathes(label=label, nii_prefix=nii_prefix+'/{}.nii')
             
         while end < len(indexss):
             print(current)
@@ -155,7 +151,7 @@ for center in centers:
             for path in group_pathes:
                 onii = nib.load(path)
                 lst.append(np.asarray(onii.dataobj).flatten()[indexs])
-
+ 
             ms,ss,n = utils.cal_mean_std_n(lst)
             for index, m, s, in zip(indexs, ms, ss):
                 mean[index] = m
@@ -167,20 +163,5 @@ for center in centers:
         std_path = os.path.join(out_dir, 'std')
         utils.gen_nii(mean, mask_nii, mean_path)
         utils.gen_nii(std, mask_nii, std_path)
-
-
-# %%
-tmp = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17.18,19,20]
-step = 3
-cur = 0
-end = 0
-while end < len(tmp):
-    print(cur)
-    end = cur + step
-    if end > len(tmp):
-        end = len(tmp)
-    indexs = tmp[cur:end]
-    cur = end
-    print(indexs)
 
 # %%
