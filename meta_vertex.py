@@ -43,12 +43,15 @@ from meta_analysis.main import voxelwise_meta_analysis
 from meta_analysis import utils
 from nibabel.gifti.gifti import GiftiDataArray,GiftiImage
 
-
 _filenames = ['origin.csv']
 _labels = [['NC', 'MC', 'AD']]
 _pairs = [[(2,0), (1,0), (2, 1)]]
 mask_path = './data/mask/rBN_Atlas_246_1mm.nii'
 output = r'./results/meta/{}_{}'
+temp_dir = r'./data/mask/BN_Atlas_freesurfer/fsaverage/fsaverage_LR32k/{}'
+surfs = ['fsaverage.L.inflated.32k_fs_LR.surf.gii', 'fsaverage.R.inflated.32k_fs_LR.surf.gii']
+l_r = ['L', 'R']
+
 for filenames, labels, pairs in zip(_filenames, _labels, _pairs):
     centers = datasets.load_centers_all(filenames=filenames)
     for pair in pairs:
@@ -94,33 +97,15 @@ for filenames, labels, pairs in zip(_filenames, _labels, _pairs):
         
         result_names = ['es','var', 'se', 'll','ul','q','z','p']
         for result, name in zip(results, result_names):
-            path = os.path.join(out_dir, '{}.gii'.format(name))
-            ct_gii = nib.load(r'E:\software\matlabPlugin\spm12\toolbox\cat12\templates_surfaces_32k\mesh.central.freesurfer.gii')
-            gdarray = GiftiDataArray.from_array(result, intent=0)
-            ct_gii.remove_gifti_data_array_by_intent(0)
-            ct_gii.add_gifti_data_array(gdarray)
-            nib.save(ct_gii, path)
+            result_l = result[:32492]
+            result_r = result[32492:]
+            result_list = [result_l, result_r]
 
-# %%
-import nilearn as nil
-from nilearn.surface import load_surf_data
-data = load_surf_data(r'E:\software\matlabPlugin\spm12\toolbox\cat12\templates_surfaces_32k\mesh.central.freesurfer.gii')
-data2 = load_surf_data(r'./results/meta/1_0/surf/es_bon_001.gii')
-print(data.shape)
-print(data2.shape)
-#%%
-tmp = data2[-1]
-print(tmp.shape)
-print(len(tmp[tmp!=0]))
-
-# %%
-from nilearn.plotting import view_surf
-
-html_view = view_surf(r'E:\software\matlabPlugin\spm12\toolbox\cat12\templates_surfaces_32k\mesh.central.freesurfer.gii',
-                    data2[-1])
-html_path = './results/a.html'
-html_view.save_as_html(html_path)
-# %%
-print(data)
-
-# %%
+            for _result, surf, lr in zip(result_list, surfs, l_r):
+                path = os.path.join(out_dir, '{}_{}.gii'.format(name, lr))
+                gii_path = temp_dir.format(surf)
+                ct_gii = nib.load(gii_path)
+                gdarray = GiftiDataArray.from_array(_result, intent=0)
+                ct_gii.remove_gifti_data_array_by_intent(0)
+                ct_gii.add_gifti_data_array(gdarray)
+                nib.save(ct_gii, path)
