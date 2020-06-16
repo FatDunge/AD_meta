@@ -69,23 +69,29 @@ import numpy as np
 path = './results/meta'
 tests = os.listdir(path)
 ps = [0.05, 0.01, 0.001]
+l_r = ['L', 'R']
+temp_dir = r'./data/mask/BN_Atlas_freesurfer/fsaverage/fsaverage_LR32k/{}'
+surfs = ['fsaverage.L.inflated.32k_fs_LR.surf.gii', 'fsaverage.R.inflated.32k_fs_LR.surf.gii']
 for test in tests:
     voxel_path = os.path.join(path, test, 'surf')
-    es_path = os.path.join(voxel_path, 'es.gii')
-    p_path =  os.path.join(voxel_path, 'p.gii')
-    
-    es_array = load_surf_data(es_path)[-1]
-    p_array = load_surf_data(p_path)[-1]
+    for lr,surf in zip(l_r, surfs):
+        es_path = os.path.join(voxel_path, 'es_{}.gii'.format(lr))
+        p_path =  os.path.join(voxel_path, 'p_{}.gii'.format(lr))
+        
+        es_array = load_surf_data(es_path)[-1]
+        p_array = load_surf_data(p_path)[-1]
 
-    voxel_count = np.size(p_array)
+        
 
-    for p in ps:
-        corrected_array = voxelwise_correction(es_array, p_array, voxel_count, thres=p)
-        new_f = os.path.join(voxel_path,'es_bon_{}.gii'.format(str(p)[2:]))
-        ct_gii = nib.load(es_path)
-        gdarray = GiftiDataArray.from_array(corrected_array, intent=0)
-        ct_gii.add_gifti_data_array(gdarray)
-        nib.save(ct_gii, new_f)
+        voxel_count = np.size(p_array) * 2
+
+        for p in ps:
+            corrected_array = voxelwise_correction(es_array, p_array, voxel_count, thres=p)
+            new_f = os.path.join(voxel_path,'es_bon_{}_{}.gii'.format(lr,str(p)[2:]))
+            ct_gii = nib.load(temp_dir.format(surf))
+            gdarray = GiftiDataArray.from_array(corrected_array, intent=0)
+            ct_gii.add_gifti_data_array(gdarray)
+            nib.save(ct_gii, new_f)
         
 
 
