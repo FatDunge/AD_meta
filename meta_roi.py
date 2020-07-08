@@ -1,12 +1,4 @@
 #%%
-#Prepare features csv
-import datasets
-import numpy as np
-import os
-import csv
-from meta_analysis import utils
-from meta_analysis.main import csv_meta_analysis
-
 def sort_models(models, filenames, orderby='es', descend=True):
     if orderby == 'es':
         list1 = [model.total_effect_size for model in models]
@@ -25,6 +17,10 @@ def bon_cor(models, filenames, thres=0.05):
     return passed, not_passed 
 #%%
 # create csv for meta analysis
+import datasets 
+import os
+from meta_analysis import utils
+
 filenames = 'origin.csv'
 centers = datasets.load_centers_all(filenames=filenames)
 out_path = './data/meta_csv'
@@ -101,7 +97,11 @@ for label_pair in label_pairs:
                                     'n2': cn,})
 
 #%%
+from meta_analysis.main import csv_meta_analysis
 thress = [0.001]
+label_pairs = [(2,0), (2,1), (1,0)]
+csv_prefixs = ['roi_gmv_removed/', 'roi_ct_removed/']
+
 for csv_prefix in csv_prefixs:
     for pair in label_pairs:
         csv_dir = './data/meta_csv/{}_{}/{}'.format(pair[0], pair[1], csv_prefix)
@@ -130,7 +130,7 @@ for csv_prefix in csv_prefixs:
             model.plot_forest(title=filename, save_path=out_path, show=False)
             i += 1
         """
-        """
+        
         csv_path = os.path.join(out_dir, 'TOP{}.csv'.format(top))
         with open(csv_path, 'w', newline='') as file:
             fieldnames = ['name', 'es', 'se', 'll', 'ul', 'z','p']
@@ -138,56 +138,58 @@ for csv_prefix in csv_prefixs:
             writer.writeheader()
             for model, filename in zip(models[:top], filenames[:top]):
                 writer.writerow({'name': filename,
-                 'es': round(model.total_effect_size,2),
-                  'se':round(model.total_standard_error,2), 
-                  'll':round(model.total_lower_limit,2), 
-                  'ul':round(model.total_upper_limit,2),
-                  'z':round(model.z, 2),
+                 'es': round(model.total_effect_size,3),
+                  'se':round(model.total_standard_error,3), 
+                  'll':round(model.total_lower_limit,3), 
+                  'ul':round(model.total_upper_limit,3),
+                  'z':round(model.z, 3),
                   'p':'{:.2e}'.format(model.p)})
-        """
+        
         
 # %%
-
 import nibabel as nib
 import pandas as pd
+import numpy as np
 import os
 from meta_analysis import utils
 from nilearn import plotting
 from meta_analysis.main import csv_meta_analysis
 
 pairs = [(2,0), (2,1),(1,0)]
-ps = [0.05, 0.01, 0.001]
-csv_path = './data/mask/BNA_subregions.csv'
+csv_path = './data/mask/gmv_id.csv'
 df = pd.read_csv(csv_path, index_col=1)
 nii_path  = './data/mask/rBN_Atlas_246_1mm.nii'
 nii = nib.load(nii_path)
 fea = 'roi_gmv_removed'
-for pair in pairs:
-    for p in ps:
-        nii_array = np.asarray(nii.dataobj, dtype=np.float32)
-        csv_dir = './data/meta_csv/{}_{}/{}'.format(pair[0], pair[1], fea)
-        out_dir = './results/meta/{}_{}/{}'.format(pair[0], pair[1], fea)
-        if not os.path.isdir(out_dir):
-            os.mkdir(out_dir)
-        csvs = os.listdir(csv_dir)
-        models = []
-        filenames = []
-        for f in csvs:
-            csv_path = os.path.join(csv_dir, f)
-            model = csv_meta_analysis(csv_path, model_type='random')
-            models.append(model)
-            filenames.append(f[:-4])
 
-        cor_model, _ = bon_cor(models, filenames, thres=p)
-        ll = [i for i in range(1, 247)]
-        for k, v in cor_model.items():
-            _id = df.loc[k]['ID']
-            nii_array[nii_array==_id] = v.total_effect_size
-            ll.remove(_id)
-        for i in ll:
-            nii_array[nii_array==i] = 0
-        path = os.path.join(out_dir, 'cor_{}.nii'.format(str(p).replace('.', '_')))
-        r = utils.gen_nii(nii_array, nii, path)
+for pair in pairs:
+    nii_array = np.asarray(nii.dataobj).astype(np.float32)
+    p_array = nii_array
+    csv_dir = './data/meta_csv/{}_{}/{}'.format(pair[0], pair[1], fea)
+    out_dir = './results/meta/{}_{}/{}'.format(pair[0], pair[1], fea)
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
+    csvs = os.listdir(csv_dir)
+    models = {}
+    for f in csvs:
+        csv_path = os.path.join(csv_dir, f)
+        model = csv_meta_analysis(csv_path, model_type='random')
+        models[f[:-4]] = model
+
+    ll = [i for i in range(1, 247)]
+
+    for k, v in models.items():
+        _id = df.loc[k]['ID']
+        nii_array[nii_array==_id] = v.total_effect_size
+        p_array[p_array==_id] = v.p
+        ll.remove(_id)
+    for i in ll:
+        nii_array[nii_array==i] = 0
+
+    path = os.path.join(out_dir, 'es.nii')
+    p_path = os.path.join(out_dir, 'p.nii')
+    utils.gen_nii(nii_array, nii, path)
+    utils.gen_nii(nii_array, nii, p_path)
 
 # %%
 import nilearn as nil
@@ -205,18 +207,19 @@ from nibabel.gifti.gifti import GiftiDataArray,GiftiImage
 
 pairs = [(2,0), (2,1),(1,0)]
 annots = ['fsaverage.L.BN_Atlas.32k_fs_LR.label.gii', 'fsaverage.L.BN_Atlas.32k_fs_LR.label.gii']
-surfs = ['fsaverage.L.inflated.32k_fs_LR.surf.gii', 'fsaverage.R.inflated.32k_fs_LR.surf.gii']
+surfs = ['lh.central.freesurfer.gii', 'rh.central.freesurfer.gii']
 l_r = ['L', 'R']
 bgs = ['lh.sulc', 'rh.sulc']
 csv_path = './data/mask/cortical_id.csv'
 df = pd.read_csv(csv_path, index_col=0)
-label_dir = r'./data/mask/BN_Atlas_freesurfer/fsaverage/fsaverage_LR32k/{}'
+annot_dir = r'./data/mask/BN_Atlas_freesurfer/fsaverage/fsaverage_LR32k/{}'
+surf_dir = r'./data/mask/cat_surf_temp_fsavg32K/{}'
 
 for pair in pairs:
     for annot, surf, bg, lr in zip(annots, surfs, bgs, l_r):
-        a = surface.load_surf_data(label_dir.format(annot))
+        a = surface.load_surf_data(annot_dir.format(annot))
         a = a.astype(np.float32)
-        b = label_dir.format(surf)
+        b = surf_dir.format(surf)
         tmp_gii = nib.load(b)
 
         csv_dir = './data/meta_csv/{}_{}/roi_ct_removed'.format(pair[0], pair[1])
@@ -232,10 +235,10 @@ for pair in pairs:
             models.append(model)
             filenames.append(f[:-4])
 
-        cor_model, _ = bon_cor(models, filenames)
+        cor_model, _ = bon_cor(models, filenames, thres=0.001)
         ll = np.unique(a).tolist()
         
-        list1, models, filenames = sort_models(models, filenames)
+        list1, models, filenames = sort_models(list(cor_model.values()), filenames, descend=False)
         p30_es = models[int(len(models)*0.3)].total_effect_size
 
         for k, v in cor_model.items():
@@ -250,7 +253,7 @@ for pair in pairs:
         gdarray = GiftiDataArray.from_array(a, intent=0)
         tmp_gii.remove_gifti_data_array_by_intent(0)
         tmp_gii.add_gifti_data_array(gdarray)
-        path = os.path.join(out_dir, 'es_{}_bon001_top30p.gii'.format(lr))
+        path = os.path.join(out_dir, 'es_{}_bon001_top30.gii'.format(lr))
         nib.save(tmp_gii, path)
 
 
