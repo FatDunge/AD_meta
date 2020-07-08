@@ -5,16 +5,15 @@ import nibabel as nib
 from nibabel import nifti1
 from scipy.stats import norm
 
-
-def voxelwise_correction(array, p_array, voxel_count, thres=0.05):
+def bonferroni_correction(array, p_array, voxel_count, thres=0.05):
     thresed_p = p_array < thres / voxel_count
     return np.multiply(array, thresed_p)
-
+#%%
+# Voxelwise correction
 mask_path = './data/mask/rBN_Atlas_246_1mm.nii'
 mask_nii = nib.load(mask_path)
 mask = np.asarray(mask_nii.dataobj)
 voxel_count = np.size(mask[mask!=0])
-#%%
 path = './results/meta'
 tests = os.listdir(path)
 ps = [0.05, 0.01, 0.001]
@@ -39,27 +38,37 @@ for test in tests:
         nifti1.save(corrected_niis, new_f)
 
 # %%
-from nilearn import plotting
-import nibabel as nib
-import matplotlib
-import os
+# ROI GMV correction
+import numpy as np
+from meta_analysis import utils
+
+test_count = 246
 path = './results/meta'
 tests = os.listdir(path)
+ps = [0.05, 0.01, 0.001]
+percents = [0.3, 0.5, 1]
+
+def load_nii_array(filepath):
+    nii =  nib.load(filepath)
+    return np.asarray(nii.dataobj), nii
+
 for test in tests:
-    voxel_path = os.path.join(path, test, 'voxel')
-    fs = os.listdir(voxel_path)
-    for f in fs:
-        if 'es_bon' in f and '.nii' in f:
-            f = os.path.join(voxel_path, f)
-            
-            es =  nib.load(f)
-            plotting.plot_stat_map(es, title=test,
-                                   cmap=matplotlib.cm.get_cmap('RdGy'),)
-            html_view = plotting.view_img(es, 
-                                          cmap=matplotlib.cm.get_cmap('RdGy'),
-                                          )
-            html_path = f[:-3]+'html'
-            html_view.save_as_html(html_path)
+    result_path = os.path.join(path, test, 'roi_gmv_removed')
+    es_array, es_nii = load_nii_array(os.path.join(result_path, 'es.nii'))
+    p_array, _ = load_nii_array(os.path.join(result_path, 'p.nii'))
+
+    for p in ps:
+        corrected_array = bonferroni_correction(es_array, p_array, test_count, thres=p)
+        for percent in percents:
+            unique = np.unique(corrected_array)
+            sorted_unique = np.sort(unique)
+            n = int(percent*len(sorted_unique))
+            thres = sorted_unique[n-1]
+            corrected_array[corrected_array > thres] = 0
+            cor_path = os.path.join(result_path, 'es_{}_top{}.nii'.format(str(p).replace('0.', ''),
+                                                                      int(percent*100)))
+            utils.gen_nii(corrected_array, es_nii, cor_path)
+
 
 # %%
 # gii correction
@@ -80,8 +89,6 @@ for test in tests:
         
         es_array = load_surf_data(es_path)[-1]
         p_array = load_surf_data(p_path)[-1]
-
-        
 
         voxel_count = np.size(p_array) * 2
 
