@@ -67,21 +67,27 @@ ad = [ad_adni, ad_edsd, ad_mcad]
 fig, ax = plt.subplots()
 
 radius = 1.5
-size = 0.45
+size = 0.55
 vals = np.array([adni, edsd, mcad])
 cmap = plt.get_cmap("tab20c")
 outer_colors = cmap(np.arange(3)*4)
 inner_colors = cmap(np.array([1,2,3,5,6,7,9,10,11]))
 
+textprops = {'family' : 'normal',
+                'weight' : 'bold',
+                'size'   : 12}
+
 ax.pie(vals.flatten(), 
        labels=['NC', 'MCI', 'AD']*3,
        autopct='%.2f%%',
-       pctdistance=0.85,
+       pctdistance=0.82,
+       textprops=textprops,
        radius=radius, colors=inner_colors,
        wedgeprops=dict(width=size, edgecolor='w'))
 ax.pie(vals.sum(axis=1),
        labels=['ADNI', 'EDSD', 'MCAD'],
-       labeldistance=0.7,
+       labeldistance=0.53,
+       textprops=textprops,
        radius=radius-size, colors=outer_colors,
        wedgeprops=dict(width=size, edgecolor='w'))
 plt.show()
