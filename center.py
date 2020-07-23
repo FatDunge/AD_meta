@@ -8,10 +8,13 @@ import re
 import xml.etree.ElementTree as ET
 
 import nibabel as nib
+import nilearn as nil
 import numpy as np
 import pandas as pd
 from nibabel.freesurfer.io import read_morph_data
 from nibabel import nifti1
+
+import utils
 
 def load_array(path, dtype=np.float32):
     nii = nib.load(path)
@@ -83,12 +86,75 @@ class Center(object):
                     tmp.append(person)
         return tmp
 
+    def create_stat_nii(self, label, temp_nii,
+                        nii_dir='mri_smoothed_removed'):
+        out_dir = os.path.join(self.file_dir, nii_dir, '{}'.format(label))
+        if not os.path.isdir(out_dir):
+            os.mkdir(out_dir)
+        group1_data, _ = self.get_nii_pathes(label=label, nii_prefix=nii_dir+'/{}.nii')
+        datas = utils.load_arrays(group1_data, dtype=np.float32)
+        mean, std, _ = utils.cal_mean_std_n(datas)
+        mean_path = os.path.join(out_dir, 'mean')
+        std_path = os.path.join(out_dir, 'std')
+        utils.gen_nii(mean, temp_nii, mean_path)
+        utils.gen_nii(std, temp_nii, std_path)
+    
+    def create_stat_gii(self, label, gii_dir='surf'):
+        out_dir = os.path.join(self.file_dir, gii_dir)
+        if not os.path.isdir(out_dir):
+            os.mkdir(out_dir)
+        out_dir = os.path.join(out_dir, '{}'.format(label))
+        if not os.path.isdir(out_dir):
+            os.mkdir(out_dir)
+        pathes, _ = self.get_resampled_gii_pathes(label=label)
+        datas = []
+        if pathes is not None:
+            for path in pathes:
+                tmp = nil.surface.load_surf_data(path)
+                datas.append(tmp[3])
+            mean, std, _ = utils.cal_mean_std_n(datas)
+            mean_path = os.path.join(out_dir, 'mean')
+            std_path = os.path.join(out_dir, 'std')
+            np.save(mean_path, mean)
+            np.save(std_path, std)
+
     def create_dir(self, dir_name):
         os.mkdir(os.path.join(self.file_dir, dir_name))
 
+    def create_rgmv_csv(self, mask, label=None,
+                        nii_prefix='mri_smoothed/{}.nii',
+                        gmv_csv_prefix='roi_gmv/{}.csv'):
+        if label is None:
+            persons = self.persons
+        else:
+            persons = self.get_by_label(label)
+        if len(persons) == 0:
+            return None, None
+        for person in persons:
+            nii_path = os.path.join(self.file_dir,
+                                    nii_prefix.format(person.filename))
+            if not os.path.exists(nii_path):
+                print('No nii file:{}:{}'.format(self.name, person.filename))
+                continue
+            csv_path = os.path.join(self.file_dir,
+                                    gmv_csv_prefix.format(person.filename))
+
+            nii = nib.load(nii_path)
+            volumes = mask.get_all_masked_volume(nii)
+
+            with open(csv_path, 'w', newline='') as file:
+                fieldnames = ['ID', 'GMV']
+                writer = csv.DictWriter(file, fieldnames=fieldnames)
+                writer.writeheader()
+                for k, v in volumes.items():
+                    writer.writerow({'ID': k, 'GMV': v})
+
     def create_rct_csv(self, label=None,
+                        cortical_id_path='./data/mask/cortical_id.csv',
                         cat_roi_prefix='label/catROIs_{}.xml',
                         ct_csv_prefix='roi_ct/{}.csv'):
+        id_df = pd.read_csv(cortical_id_path, index_col=0)
+        
         if label is None:
             persons = self.persons
         else:
@@ -122,7 +188,7 @@ class Center(object):
                     if name[0].lower() == name[-1].lower():
                         if '/' in name:
                             name = name.replace('/', '-')
-                        writer.writerow({'ID': name, 'CT': thickness})
+                        writer.writerow({'ID': id_df.loc[name]['ID'], 'CT': thickness})
 
     def get_nii_pathes(self, label=None, nii_prefix='mri/wm{}.nii'):
         pathes = []

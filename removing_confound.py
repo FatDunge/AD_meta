@@ -6,7 +6,6 @@ import mask
 import nibabel as nib
 from sklearn.preprocessing import OneHotEncoder
 
-_mask = mask.Mask('./data/mask', 'rBN_Atlas_246_1mm.nii')
 centers = datasets.load_centers_all()
 
 def get_index(lst, item):
@@ -40,9 +39,9 @@ def create_x(center, intercept=None):
         x = np.hstack((amfs, tivs, onehot_lables))
     return x
 
-def create_y_nii(center, _mask, nii_prefix='mri_smoothed/{}.nii'):
+def create_y_nii(center, mask, nii_prefix='mri_smoothed/{}.nii'):
     y = []
-    d = _mask.get_mask_data().flatten()
+    d = mask.get_mask_data().flatten()
     index = get_index(d, 0)
     pathes, *_ = center.get_nii_pathes(nii_prefix=nii_prefix)
     for path in pathes:
@@ -51,7 +50,8 @@ def create_y_nii(center, _mask, nii_prefix='mri_smoothed/{}.nii'):
     y = np.array(y)
     return y, index
 #%%
-#Remove Nii
+#Remove Nii(persudo inverse)
+"""
 nii_prefix = 'mri_smoothed/{}.nii'
 for center in centers:
     if len(center.persons) > 20:
@@ -74,78 +74,116 @@ for center in centers:
             nii = nib.Nifti1Image(image, onii.affine, header)
             center.save_nii(person, nii)
 #%%
+"""
 # Remove Nii using linear regression
 from sklearn.linear_model import HuberRegressor
 import time
-nii_prefix = 'mri_smoothed/{}.nii'
 
-d = _mask.get_mask_data().flatten()
-indexss = get_index(d, 0)
-i = 0
-batch_size = 100000
-current = 0
-end = 0
-regs = []
-st = time.time()
+def nii_regs(center, mask, nii_prefix='mri_smoothed/{}.nii',
+             batch_reg=False,
+             batch_size=500000):
+    d = mask.data.flatten()
+    flatten_indices = get_index(d, 0)
+    total_indices = len(flatten_indices)
+    current = 0
+    end = 0
 
-x = None
-print('loading x')
-for center in centers:
-    if x is None:
-        x = create_x(center)
+    st = time.time()
+
+    x = None
+    print(center.name)
+    print('loading x')
+    x = create_x(center)
+    et = time.time()
+    print('x time: {}'.format(et-st))
+    st = et
+
+    regs = []
+    if batch_reg:
+        while end < total_indices:
+            end = current + batch_size
+            if end > total_indices:
+                end = total_indices
+            batch_indices = flatten_indices[current:end]
+            current = end
+
+            ys = []
+            print('loading y')
+            pathes, *_ = center.get_nii_pathes(nii_prefix=nii_prefix)
+            for path in pathes:
+                nii = nib.load(path)
+                ys.append(np.asarray(nii.dataobj).flatten()[batch_indices])
+            et = time.time()
+            print('y time: {}'.format(et-st))
+            st = et
+            ys = np.asarray(ys)
+            print('Regression')
+            for y in ys.T:
+                reg = HuberRegressor().fit(x, y)
+                regs.append(reg)
+            et = time.time()
+            print('Regression time:{}'.format(et-st))
+            st = et
     else:
-        x = np.concatenate((x, create_x(center))) 
-et = time.time()
-print('x time: {}'.format(et-st))
-st = et
-
-while end < len(indexss):
-    end = current + batch_size
-    if end > len(indexss):
-        end = len(indexss)
-    indexs = indexss[current:end]
-    current = end
-
-    ys = []
-    for center in centers:
+        ys = []
         print('loading y')
         pathes, *_ = center.get_nii_pathes(nii_prefix=nii_prefix)
         for path in pathes:
             nii = nib.load(path)
-            ys.append(np.asarray(nii.dataobj).flatten()[indexs])
+            ys.append(np.asarray(nii.dataobj).flatten()[flatten_indices])
         et = time.time()
         print('y time: {}'.format(et-st))
         st = et
-    ys = np.asarray(ys)
-    print('Regression')
-    for y in ys.T:
-        reg = HuberRegressor().fit(x, y)
-        regs.append(reg)
-    et = time.time()
-    print('Regression time:{}'.format(et-st))
-    st = et
+        ys = np.asarray(ys)
+        print('Regression')
+        for y in ys.T:
+            reg = HuberRegressor().fit(x, y)
+            regs.append(reg)
+        et = time.time()
+        print('Regression time:{}'.format(et-st))
+        st = et
+    print('Regs complete')
+    return regs, flatten_indices
 
+def save_removed_nii(center, regs, flatten_indices, nii_prefix='mri_smoothed/{}.nii'):
+    pathes, *_ = center.get_nii_pathes(nii_prefix=nii_prefix)
+    x = create_x(center)
+    for (path, xi, person) in zip(pathes, x, center.persons):
+        onii = nib.load(path)
+        header = onii.header
+        header.set_data_dtype(np.float16)
+        image = np.zeros(shape=(181*217*181))
+        datas = np.asarray(onii.dataobj).flatten()[flatten_indices]
+        for v, index, reg in zip(datas, flatten_indices, regs):
+            image[index] = v - np.dot(xi[:4], reg.coef_[:4])
+        image = np.reshape(image, (181, 217, 181))
+        nii = nib.Nifti1Image(image, onii.affine, header)
+        center.save_nii(person, nii)
+
+def remove_nii(centers, mask, nii_prefix='mri_smoothed/{}.nii', batch_size=500000):
+    for center in centers:
+        regs, flatten_indices = nii_regs(center, mask, nii_prefix, batch_size)
+        print('Saving data')
+        save_removed_nii(center, regs, flatten_indices, nii_prefix)
+        print('Saved')
 #%%
 # Remove Resampled gii using linear regression
 from sklearn.linear_model import HuberRegressor
 import time
+from nibabel.gifti.gifti import GiftiDataArray,GiftiImage
 
-regs = []
-st = time.time()
+def gii_regs(center):
+    regs = []
+    st = time.time()
 
-x = None
-print('loading x')
-for center in centers:
-    if x is None:
-        x = create_x(center)
-    else:
-        x = np.concatenate((x, create_x(center))) 
-et = time.time()
-print('x time: {}'.format(et-st))
-st = et
+    x = None
+    print('loading x')
+    x = create_x(center)
+    et = time.time()
+    print('x time: {}'.format(et-st))
+    st = et
 
-ys = []
-for center in centers:
+    ys = []
     print('loading y')
     pathes, *_ = center.get_cortical_thickness_pathes()
     for path in pathes:
@@ -155,77 +193,44 @@ for center in centers:
     et = time.time()
     print('y time: {}'.format(et-st))
     st = et
-ys = np.asarray(ys)
-ys = np.nan_to_num(ys)
-print('Regression')
-for y in ys.T:
-    reg = HuberRegressor().fit(x, y)
-    regs.append(reg)
-et = time.time()
-print('Regression time:{}'.format(et-st))
-st = et
-#%%
-import pickle
-output = open('./data/regs_ct.pkl', 'wb')
-pickle.dump(regs, output)
-output.close()
+    ys = np.asarray(ys)
+    ys = np.nan_to_num(ys)
+    print('Regression')
+    for y in ys.T:
+        reg = HuberRegressor().fit(x, y)
+        regs.append(reg)
+    et = time.time()
+    print('Regression time:{}'.format(et-st))
+    return regs
 
-#%%
-import pickle
-inputs = open('./data/regs_ct.pkl', 'rb')
-regs = pickle.load(inputs)
-inputs.close()
-#%%
-import pickle
-tmp = [reg.coef_ for reg in regs]
-output = open('./data/regs_coef.pkl', 'wb')
-pickle.dump(tmp, output)
-output.close()
-#%%
-tmp = np.asarray(tmp)
-tmp[tmp==0]
+def remove_gii(centers):
+    for center in centers:
+        regs = gii_regs(center)
+
+        pathes, *_ = center.get_cortical_thickness_pathes()
+        x = create_x(center)
+        for xi,path in zip(x, pathes):
+            ct_gii = nib.load(path)
+            newpath = path.replace('resampled_32k', 'resampled_32k.removed')
+            ct_darray = ct_gii.get_arrays_from_intent(0)[0]
+            data = ct_darray.data
+            shape = data.shape
+            data = np.nan_to_num(data)
+            data = data.flatten()
+            new_data = np.zeros_like(data)
+            index = data!=np.nan
+            for (reg,i) in zip(regs,index):
+                new_data[i] = data[i] - np.dot(xi[:4], reg.coef_[:4])
+            new_data = np.reshape(new_data, newshape=shape)
+            gdarray = GiftiDataArray.from_array(new_data, intent=0)
+            ct_gii.remove_gifti_data_array_by_intent(0)
+            ct_gii.add_gifti_data_array(gdarray)
+            nib.save(ct_gii, newpath)
+"""
 #%%
 # Process and save removed Nii(Linear regression)
-for center in centers:
-    pathes, *_ = center.get_nii_pathes(nii_prefix=nii_prefix)
-    x = create_x(center)
-    for (path, xi, person) in zip(pathes, x, center.persons):
-        onii = nib.load(path)
-        print(path)
-        header = onii.header
-        header.set_data_dtype(np.float32)
-        image = np.zeros(shape=(181*217*181))
-        datas = np.asarray(onii.dataobj).flatten()[indexss]
-        for v, index, reg in zip(datas, indexss, regs):
-            image[index] = v - np.dot(xi[:4], reg.coef_[:4])
-        image = np.reshape(image, (181, 217, 181))
-        nii = nib.Nifti1Image(image, onii.affine, header)
-        center.save_nii(person, nii)
 
-#%%
-from nibabel.gifti.gifti import GiftiDataArray,GiftiImage
 
-for center in centers:
-    pathes, *_ = center.get_cortical_thickness_pathes()
-    x = create_x(center)
-    for xi,path in zip(x, pathes):
-        ct_gii = nib.load(path)
-        newpath = path.replace('resampled_32k', 'resampled_32k.removed')
-        ct_darray = ct_gii.get_arrays_from_intent(0)[0]
-        data = ct_darray.data
-        shape = data.shape
-        data = np.nan_to_num(data)
-        data = data.flatten()
-        new_data = np.zeros_like(data)
-        index = data!=np.nan
-        for (reg,i) in zip(regs,index):
-            new_data[i] = data[i] - np.dot(xi[:4], reg.coef_[:4])
-        new_data = np.reshape(new_data, newshape=shape)
-        gdarray = GiftiDataArray.from_array(new_data, intent=0)
-        ct_gii.remove_gifti_data_array_by_intent(0)
-        ct_gii.add_gifti_data_array(gdarray)
-        nib.save(ct_gii, newpath)
-    
 #%%
 nii_prefix = 'mri_smoothed/{}.nii'
 for center in centers:
@@ -248,24 +253,28 @@ for center in centers:
             image = np.reshape(image, (181, 217, 181))
             nii = nib.Nifti1Image(image, onii.affine, header)
             center.save_nii(person, nii)
-
+"""
 #%%
 #--------------------------------------------------------------
 # remove csv feature by center
 from sklearn.linear_model import HuberRegressor
 import csv
 import os
-csv_prefix = 'roi_gmv/{}.csv'
-out_prefix = 'roi_gmv_removed/{}.csv'
-for center in centers:
-    if len(center.persons) > 20:
+def remove_roi(centers, csv_prefix='roi_gmv/{}.csv',
+               out_prefix='roi_gmv_removed/{}.csv'):
+    for center in centers:
+        print(center.name)
+        print('loading x')
         x = create_x(center)
+        print('loading y')
         ys, _, ids = center.get_csv_values(prefix=csv_prefix, flatten=True)
         yst = ys.T
         regs = []
+        print('Regression')
         for y in yst:
             reg = HuberRegressor().fit(x, y)
             regs.append(reg)
+        print('Write New Data')
         for (xi, person, yi) in zip(x, center.persons, ys):
             xi = xi[:4]
             path = os.path.join(center.file_dir, out_prefix.format(person.filename))
@@ -275,9 +284,9 @@ for center in centers:
                 for (yii, reg, _id) in zip(yi, regs, ids):
                     yii_hat = yii - np.dot(xi, reg.coef_[:4])
                     writer.writerow({'ID': _id,
-                                     'GMV': yii_hat})
+                                    'GMV': yii_hat})
 
-
+"""
 # %%
 from sklearn.linear_model import HuberRegressor
 import csv
@@ -321,3 +330,4 @@ for center in centers:
                                      'CT': yii_hat})
 
 # %%
+"""

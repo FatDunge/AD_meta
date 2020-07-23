@@ -3,73 +3,64 @@ import os
 import meta_analysis
 import datasets
 import nibabel as nib
-from meta_analysis.mask import Mask
 import numpy as np
 from meta_analysis.main import voxelwise_meta_analysis
-from meta_analysis import utils
+from meta_analysis.mask import Mask
+import utils
 
-_dir = 'mri_smoothed_removed'
-nii_prefix = _dir + '/{}.nii'
-_filenames = ['origin.csv']
-_labels = [['NC', 'MC', 'AD']]
-_pairs = [[(2,0), (1,0), (2, 1)]]
-mask_path = './data/mask/rBN_Atlas_246_1mm.nii'
-output = r'./results/meta/{}_{}'
-
-mask_nii = nib.load(mask_path)
-mask = Mask(np.asarray(mask_nii.dataobj))
 #%%
 # load nii of mean, std, preform voxelwise_meta_analysis
-for filenames, labels, pairs in zip(_filenames, _labels, _pairs):
-    centers = datasets.load_centers_all(filenames=filenames)
-    for pair in pairs:
-        center_dict = {}
-        group1_label = pair[0]
-        group2_label = pair[1]
-        
-        out_dir = output.format(group1_label, group2_label)
-        if not os.path.isdir(out_dir):
-            os.mkdir(out_dir)
+def meta_nii(centers, label_eg, label_cg,
+               mask_path='./data/mask/rBN_Atlas_246_1mm.nii',
+               mri_dir='mri_smoothed_removed',
+               out_dir='./results/meta/{}_{}'):
+    mask_nii = nib.load(mask_path)
+    mask = Mask(np.asarray(mask_nii.dataobj))
+    
+    out_dir = out_dir.format(label_eg, label_cg)
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
 
-        out_dir = os.path.join(out_dir, 'voxel')
-        if not os.path.isdir(out_dir):
-            os.mkdir(out_dir)
-        with open(os.path.join(out_dir, 'centers.txt'), "w") as text_file:
-            center_mean_dict = {}
-            center_std_dict = {}
-            center_count_dict = {}
-            for center in centers:
-                n1 = len(center.get_by_label(group1_label))
-                n2 = len(center.get_by_label(group2_label))
-                if n1 == 0 or n2 == 0:
-                    continue
-                print('{}: e:{}, c:{}'.format(center.name, n1, n2), file=text_file)
-                group_mean_dict = {}
-                group_std_dict = {}
-                group_count_dict = {}
-                for label in [group1_label, group2_label]:
-                    m, s, n = center.load_msn_nii(label, _dir=_dir)
-                    group_mean_dict[label] = m
-                    group_std_dict[label] = s
-                    group_count_dict[label] = n
+    out_dir = os.path.join(out_dir, 'voxel')
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
+    with open(os.path.join(out_dir, 'centers.txt'), "w") as text_file:
+        center_mean_dict = {}
+        center_std_dict = {}
+        center_count_dict = {}
+        for center in centers:
+            n1 = len(center.get_by_label(label_eg))
+            n2 = len(center.get_by_label(label_cg))
+            if n1 == 0 or n2 == 0:
+                continue
+            print('{}: e:{}, c:{}'.format(center.name, n1, n2), file=text_file)
+            group_mean_dict = {}
+            group_std_dict = {}
+            group_count_dict = {}
+            for label in [label_eg, label_cg]:
+                m, s, n = center.load_msn_nii(label, _dir=mri_dir)
+                group_mean_dict[label] = m
+                group_std_dict[label] = s
+                group_count_dict[label] = n
 
-                center_mean_dict[center.name] = group_mean_dict
-                center_std_dict[center.name] = group_std_dict
-                center_count_dict[center.name] = group_count_dict
+            center_mean_dict[center.name] = group_mean_dict
+            center_std_dict[center.name] = group_std_dict
+            center_count_dict[center.name] = group_count_dict
 
-        results = voxelwise_meta_analysis(group1_label, group2_label,
-                                        center_mean_dict=center_mean_dict,
-                                        center_std_dict=center_std_dict,
-                                        center_count_dict=center_count_dict,
-                                        _mask=mask, dtype=np.float32)
-        
-        result_names = ['es','var', 'se', 'll','ul','q','z','p']
-        for result, name in zip(results, result_names):
-            path = os.path.join(out_dir, '{}.nii'.format(name))
-            utils.gen_nii(result, mask_nii, path)
+    results = voxelwise_meta_analysis(label_eg, label_cg,
+                                    center_mean_dict=center_mean_dict,
+                                    center_std_dict=center_std_dict,
+                                    center_count_dict=center_count_dict,
+                                    _mask=mask, dtype=np.float32)
+    
+    result_names = ['es','var', 'se', 'll','ul','q','z','p']
+    for result, name in zip(results, result_names):
+        path = os.path.join(out_dir, '{}.nii'.format(name))
+        utils.gen_nii(result, mask_nii, path)
 
 # %%
 # Generate mean, std nii
+"""
 import os
 import datasets
 import nibabel as nib
@@ -165,3 +156,4 @@ for center in centers:
         utils.gen_nii(std, mask_nii, std_path)
 
 # %%
+"""

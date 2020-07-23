@@ -42,34 +42,29 @@ for test in tests:
 import numpy as np
 from meta_analysis import utils
 
-test_count = 246
-path = './results/meta'
-tests = os.listdir(path)
-ps = [0.05, 0.01, 0.001]
-percents = [0.3, 0.5, 1]
-
 def load_nii_array(filepath):
     nii =  nib.load(filepath)
     return np.asarray(nii.dataobj), nii
 
-for test in tests:
-    result_path = os.path.join(path, test, 'roi_gmv_removed')
-    es_array, es_nii = load_nii_array(os.path.join(result_path, 'es.nii'))
-    p_array, _ = load_nii_array(os.path.join(result_path, 'p.nii'))
+def roi_correction(value_path, p_path, count, out_path, p=0.001, top=1):
+    v_array, v_nii = load_nii_array(value_path)
+    p_array, _ = load_nii_array(p_path)
 
-    for p in ps:
-        corrected_array = bonferroni_correction(es_array, p_array, test_count, thres=p)
-        for percent in percents:
-            unique = np.unique(corrected_array)
-            sorted_unique = np.sort(unique)
-            n = int(percent*len(sorted_unique))
-            thres = sorted_unique[n-1]
-            corrected_array[corrected_array > thres] = 0
-            cor_path = os.path.join(result_path, 'es_{}_top{}.nii'.format(str(p).replace('0.', ''),
-                                                                      int(percent*100)))
-            utils.gen_nii(corrected_array, es_nii, cor_path)
+    corrected_array = bonferroni_correction(v_array, p_array, count, thres=p)
+    unique = np.unique(corrected_array)
+    sorted_unique = np.sort(unique)
+    n = int(top*len(sorted_unique))
+    thres = sorted_unique[n-1]
+    corrected_array[corrected_array > thres] = 0
+    cor_path = os.path.join(out_path, 'es_bon{}_top{}.nii'.format(str(p)[2:],
+                                                                  int(top*100)))
+    utils.gen_nii(corrected_array, v_nii, cor_path)
 
-
+#%%
+vp = r'.\results\correlation\1_0\ct\MMSE/r.nii'
+pp = r'.\results\correlation\1_0\ct\MMSE/p.nii'
+out_path = r'.\results\correlation\1_0\ct\MMSE'
+roi_correction(vp, pp, 1, out_path, p=0.05,top=1)
 # %%
 # gii correction
 from nilearn.surface import load_surf_data

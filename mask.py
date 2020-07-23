@@ -13,122 +13,70 @@ def nomalize(data):
     return (data-_min)/(_max-_min)
 
 class Mask(object):
-    """docstring for Mask
-
-    Attributes:
-        file_dir: file dir that this mask are in
-        filename: mask's filename
-        nii: mask's niimage(Nifti1Image)
-    """
-    def __init__(self, file_dir, filename):
-        super(Mask, self).__init__()
-        self.file_dir = file_dir
+    def __init__(self, filename, data):
         self.filename = filename
-        mask_path = os.path.join(file_dir, filename)
-        self.nii = nib.load(mask_path)
-        self.data = np.asarray(self.nii.dataobj)
+        self.data = data
+        self.shape = data.shape
+        labels = np.unique(data)
+        # Remove 0 as it usually don't act as label
+        self.labels = labels[labels!=0]
+        self.indices = np.transpose(np.nonzero(self.data))
 
-    def get_mask_data(self, label=None):
-        """get this mask's array data
-
+    def get_label_bool(self, label):
+        """get bool array by label
+        Args:
+            label: int, label in self.labels
         Returns:
-            ndarray
+            ndarray: bool array of label
         """
-        if label is None:
-            mask_data = nomalize(self.data)
-        else:
-            mask_data = self.data==label
-        return mask_data
+        assert label in self.labels
+        # Bool element will be treated as 1 and 0 for further calculation
+        return self.data==label
 
-    def get_min_max_label(self):
-        _min = np.min(self.data)
-        _max = np.max(self.data)
-        return _min, _max
-
-    def get_masked_image_data(self, image, label=None, mode='array'):
+    def get_masked_data(self, array, label):
+        """return masked array
+        Args:
+            array: ndarray
+            label: mask label
+        Return:
+            masked array
         """
-            mode: string, 
-                'array': numpy array, same shape with mask data
-                'nii': nibabel nifti1 instance
-        """
-        mask_data = self.get_mask_data(label)
-        data = np.asarray(image.dataobj)
-        return np.multiply(mask_data, data)
+        bool_array = self.get_label_bool(label)
+        return np.multiply(array, bool_array)
 
-    def get_masked_volume(self, image, label):
-        return np.sum(self.get_masked_image_data(image, label))
+    def get_masked_volume(self, array, label):
+        return np.sum(self.get_masked_data(array, label))
 
-    def get_all_masked_volume(self, image):
-        volumes = []
-        _min, _max = self.get_min_max_label()
-        for i in range(_min, _max+1):
-            if i == 0:
-                pass
-            else:
-                volumes.append(self.get_masked_volume(image, i))
+    def get_masked_mean(self, array, label):
+        summed = np.sum(self.get_masked_data(array, label))
+        n = np.count_nonzero(self.get_masked_data(array, label))
+        return summed/n
+
+    def get_all_masked_volume(self, array):
+        volumes = {}
+        labels = self.labels
+        for i in labels:
+            volumes[i] = self.get_masked_volume(array, i)
         return volumes
-    
-    def get_masked_count(self, image, label):
-        mask_data = self.get_mask_data(label)
-        count = np.sum(mask_data==True)
-        return count
 
-    def get_masked_mean(self, image, label):
-        volume = self.get_masked_volume(image, label)
-        count = self.get_masked_count(image, label)
-        return volume / count
-    
-    def get_all_masked_mean(self, image):
-        means = []
-        _min, _max = self.get_min_max_label()
-        for i in range(_min, _max+1):
-            if i == 0:
-                pass
-            else:
-                means.append(self.get_masked_mean(image, i))
+    def get_all_masked_mean(self, array):
+        means = {}
+        labels = self.labels
+        for i in labels:
+            means[i] = self.get_masked_mean(array, i)
         return means
 
-class Masks(object):
-    """class to manage all Mask instance
-
-    Attributes:
-        file_dir: file dir contains all mask's file
-        masks_dict: dict of all mask
-    """
-    def __init__(self, file_dir):
-        super(Masks, self).__init__()
+class NiiMask(Mask):
+    def __init__(self, file_dir, filename):
         self.file_dir = file_dir
-        self.masks_dict = self.load_masks()
+        filepath = os.path.join(file_dir, filename)
+        self.nii = nib.load(filepath)
+        super().__init__(filename, np.asarray(self.nii.dataobj))
 
-    def load_masks(self):
-        """load masks as a dict contains Mask instance
-        file_dir must not have other file
+    def get_all_masked_volume(self, nii):
+        array = np.asarray(nii.dataobj)
+        return super().get_all_masked_volume(array)
 
-        Returns:
-            dict, {filename: Mask, ...}
-        """
-        mask_filenames = os.listdir(self.file_dir)
-        masks_dict = {}
-        for filename in mask_filenames:
-            mask = Mask(self.file_dir, filename)
-            masks_dict[filename] = mask
-        return masks_dict
-
-    def get_masks_name(self):
-        """get all mask's filename, aka region's name.
-
-        Returns:
-            list of string, all keys
-        """
-        return self.masks_dict.keys()
-
-    def get_masks_data(self):
-        """get all mask's array data
-
-        Returns:
-            dict, {mask_name: ndarray}
-        """
-        masks_data_dict = {}
-        for k, value in self.masks_dict.items():
-            masks_data_dict[k] = value.get_mask_data()
-        return masks_data_dict
+    def get_all_masked_mean(self, nii):
+        array = np.asarray(nii.dataobj)
+        return super().get_all_masked_mean(array)

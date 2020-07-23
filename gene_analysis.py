@@ -1,3 +1,4 @@
+"""
 #%%
 # load roi effect sizes
 import pandas as pd
@@ -55,7 +56,7 @@ for es_prefix, roi_id_path, out_path in zip(es_prefixs, roi_id_paths, out_paths)
             if norm:
                 a = min_max(a)
                 b = min_max(b)
-            """
+            
             if gene_name == 'PSN':
                 plt.plot(a, b, '.')
                 r = pearsonr(a, b)[0]
@@ -67,7 +68,7 @@ for es_prefix, roi_id_path, out_path in zip(es_prefixs, roi_id_paths, out_paths)
                 plt.ylabel('Gene Expression of ROI')
                 plt.legend()
                 plt.show()
-            """
+            
             r = pearsonr(a, b)[0]
             p = pearsonr(a, b)[1]
 
@@ -113,61 +114,45 @@ geng_list = list_contains(gene_list, total_list)
 
 df1 = gene_df[gene_list]
 df1.to_csv(save_path)
-
+"""
 # %%
 # PLSR
+from scipy import stats
 import pandas as pd
-gene_path = './data/gene/expression.csv'
-gene_df = pd.read_csv(gene_path, index_col=0)
-t = gene_df.values
-pair = (2, 0)
-es_prefix = 'roi_gmv_removed/TOP246.csv'
-es_path = './results/meta/{}_{}/{}'.format(pair[0], pair[1], es_prefix)
-es_df = pd.read_csv(es_path, index_col=0)
+from pyls import pls_regression
+def plsr(roi_models, n_components=2, 
+         n_perm=5000, n_boot=5000,
+         gene_path='./data/gene/expression.csv',
+         out_path='./data/gene/expression_plsr.csv'):
+    roi_es_dict = {}
+    for k, v in roi_models.items():
+        roi_es_dict[int(k)] = v.total_effect_size
 
-roi_id_path = './data/mask/gmv_id.csv'
-roi_id_df = pd.read_csv(roi_id_path, index_col='name')
+    roi_df = pd.DataFrame.from_dict(roi_es_dict, orient='index', columns=['es'])
 
-ndf = pd.merge(es_df['es'], roi_id_df['ID'], on='name').set_index('ID')
-es_filtered = ndf[ndf.index.isin(gene_df.index)]
-c = es_filtered.values
-# %%
-from sklearn.cross_decomposition import PLSRegression
-pls2 = PLSRegression(n_components=2)
-pls2.fit(t, c)
+    gene_df = pd.read_csv(gene_path, index_col=0)
+    
+    es_filtered = roi_df[roi_df.index.isin(gene_df.index)]
+    gene_filtered = gene_df[gene_df.index.isin(es_filtered.index)]
+    x = gene_filtered.values
+    y = es_filtered.values
+    
+    x = stats.zscore(x)
+    y = stats.zscore(y)
 
-# %%
-pls2.x_weights_[:,0].shape
+    plsr = pls_regression(x, y, n_components=n_components, n_perm=n_perm,
+                          n_boot=n_boot)
+
+    pls1 = plsr.x_weights.T[0]
+    pls2 = plsr.x_weights.T[1]
+    gene_name = list(gene_df.columns)
+    d = {'gene_name':gene_name, 'pls1':pls1, 'pls2':pls2}
+    df = pd.DataFrame(d)
+    df.set_index('gene_name')
+    df.to_csv(out_path)
+    return plsr
+
 #%%
-pls1 = pls2.x_weights_[:,0]
-gene_name = list(gene_df.columns)
-d = {'gene_name':gene_name,'pls1':pls1}
-df = pd.DataFrame(d, index)
-df.to_csv('./data/gene/expression_pls1.csv')
-# %%
-from sklearn.model_selection import permutation_test_score
-score, permutation_scores, pvalue = permutation_test_score(
-    pls2, t, c, scoring="accuracy", n_permutations=100, n_jobs=1)
-
-
-# %%
-len()
-
-# %%
-import nilearn as nil
-import nibabel as nib
-import os
-
-src_dir = r'H:\workspace\JuSpace\Juspace_v1\PETatlas'
-to_dir = r'./data/PET'
-temp = r'./data/mask/ch2bet.nii'
-temp_nii = nib.load(temp)
-fs = os.listdir(src_dir)
-for f in fs:
-    src_path = os.path.join(src_dir, f)
-    to_path = os.path.join(to_dir, f)
-    src_nii = nib.load(src_path)
-    to_nii = nil.image.resample_to_img(src_nii, temp_nii)
-    nib.save(to_nii, to_path)
-
-# %%
+import seaborn as sns
+def cfg_distribution(x):
+    sns.distplot(x)
