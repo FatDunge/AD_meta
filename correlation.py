@@ -1,19 +1,24 @@
 # %%
 # Effect size with MMSE t-value
 import pandas as pd
-from numpy.polynomial.polynomial import polyfit
-import matplotlib.pyplot as plt
 import numpy as np
-from scipy.stats import pearsonr
-import datasets
+import matplotlib.pyplot as plt
 import os
-from meta_analysis.main import csv_meta_analysis
-import utils
 import nibabel as nib
 import seaborn as sns
 
+from numpy.polynomial.polynomial import polyfit
+from scipy.stats import pearsonr
+
+import datasets
+import utils
+from meta_analysis.main import csv_meta_analysis
+
+plt.ioff()
+
 class Result(object):
-    def __init__(self, r, p):
+    def __init__(self, name, r, p):
+        self.name = name
         self.r = r
         self.p = p
 
@@ -47,7 +52,9 @@ def cor_roi_confound(roi_models, confound_model, mask,
 
 # Correlation with PET
 def cor_roi_pet(roi_models, pet_dir,
-                out_dir):
+                fig_width=5, fig_height=5,
+                out_dir=None, show=False, save=True,
+                fontsize=14):
     files = os.listdir(pet_dir)
     roi_es_dict = {}
     for k, v in roi_models.items():
@@ -57,10 +64,10 @@ def cor_roi_pet(roi_models, pet_dir,
     roi_df.index.name = 'ID'
     roi_df.index = roi_df.index.map(int)
 
+    results = []
     for f in files:
         path = os.path.join(pet_dir, f)
         df = pd.read_csv(path, index_col=0)
-        roi_df.index = roi_df.index.map(int)
         nndf = pd.merge(roi_df, df, left_on='ID', right_on='ID', left_index=True)
 
         x = nndf['es'].to_list()
@@ -68,47 +75,23 @@ def cor_roi_pet(roi_models, pet_dir,
 
         r = pearsonr(x, y)[0]
         p = pearsonr(x, y)[1]
+        if 'SERT' in f:
+            result = Result(f[:f.rfind('_')], r, p)
+        else:
+            result = Result(f[:f.find('_')], r, p)
+        results.append(result)
 
-        sns.regplot(x=x,y=y, robust=True, label='r={:.2f}, p={:.2e}'.format(r, p))
-        plt.xlabel('Effect size of ROI')
-        plt.ylabel(f[:-4])
-        plt.xticks()
-        plt.yticks()
-        plt.legend()
-        plt.savefig(os.path.join(out_dir, f[:-4]+'.png'))
-        plt.show()
-
-#%%
-"""
-# Partial Correlation with PET
-import pandas as pd
-from numpy.polynomial.polynomial import polyfit
-import matplotlib.pyplot as plt
-import numpy as np
-from scipy.stats import pearsonr
-from pingouin import partial_corr
-
-roi_id_path = './data/mask/gmv_id.csv'
-roi_id_df = pd.read_csv(roi_id_path, index_col=1)
-
-es_path = './results/meta/2_0/roi_gmv_removed/TOP246.csv'
-es_df = pd.read_csv(es_path, index_col=0)
-
-ndf = pd.merge(es_df['es'], roi_id_df['ID'], on='name')
-ndf.set_index('ID')
-
-cov_path = './data/mask/tpm.csv'
-cov_df = pd.read_csv(cov_path, index_col=0)
-
-pet_path = './data/PET/masked_mean'
-files = os.listdir(pet_path)
-for f in files:
-    path = os.path.join(pet_path, f)
-    df = pd.read_csv(path, index_col=0)
-    nndf = pd.merge(ndf, df, left_on='ID', right_on='id', left_index=True)
-    nndf = pd.merge(nndf, cov_df, left_on='id', right_on='id', left_index=True)
-    ans = partial_corr(nndf, x='es', y='value', covar='tpm')
-    print(f,ans.iloc[0]['r'])
-# %%
-ans
-"""
+        if show or save:
+            _, ax = plt.subplots(figsize=(float(fig_width), float(fig_height)))
+            ax = sns.regplot(x=x,y=y, robust=True,
+                             ax=ax)
+            ax.set_title('r={:.2f}, p={:.2e}'.format(r, p), fontdict={'fontsize': fontsize})
+            ax.set_xlabel('Effect size of ROIs', fontsize=fontsize)
+            ax.set_ylabel(f[:-4], fontsize=fontsize)
+            ax.tick_params(axis='both', which='major', labelsize=fontsize)
+            if show:
+                plt.show()
+            if save:
+                plt.savefig(os.path.join(out_dir, f[:-4]+'.png'))
+            plt.close()
+    return results
