@@ -46,3 +46,8 @@ def load_centers_all(filenames='origin.csv', adni_merge=True):
     else:
         centers_adni = load_centers_adni(filenames)
     return centers_mcad + centers_edsd + centers_adni
+
+def load_centers_young(filenames='origin.csv'):
+    center_dir = './data/young'
+    centers = load_centers(center_dir, filenames)
+    return centers
