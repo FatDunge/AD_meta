@@ -340,10 +340,10 @@ def plot_roi_aging(young_centers, old_centers, labels, roi):
     ax2.scatter(all_ages, all_roi_values, alpha=0.5)
     ax2.set_title(slabels[labels[1]]+'-'+str(roi))
 # %%
-def plot_mmse_cor(old_centers, roi=1):
+def plot_mmse_cor(centers, roi=1):
     all_ages = []
     all_roi_values = []
-    for center in old_centers:
+    for center in centers:
         roi_values, *_ = center.get_csv_values(
                             prefix='roi_gmv/{}.csv',
                             flatten=True)
@@ -360,5 +360,3 @@ def plot_mmse_cor(old_centers, roi=1):
     plt.scatter(all_ages, all_roi_values, alpha=0.5)
     plt.title('r:{:.2f}, p:{:.2e}'.format(r, p))
     plt.show()
-
-# %%
