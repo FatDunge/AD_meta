@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 from nibabel.freesurfer.io import read_morph_data
 from nibabel import nifti1
+from nilearn import image
 
 import utils
 
@@ -205,6 +206,15 @@ class Center(object):
             labels.append(person.label)
         labels = np.asarray(labels)
         return pathes, labels
+
+    def create_smoothed_image(self, fwhm=4, in_prefix='mri/mwp1{}.nii',
+                              out_prefix='mri_smoothed/{}.nii'):
+        for person in self.persons:
+            path = os.path.join(self.file_dir,
+                                in_prefix.format(person.filename))
+            origin_nii = nib.load(path)
+            nii = image.smooth_img(origin_nii, fwhm)
+            self.save_nii(person, nii, nii_prefix=out_prefix)
 
     def save_nii(self, person, nii, nii_prefix='mri_smoothed_removed/{}.nii'):
         path = os.path.join(self.file_dir,
