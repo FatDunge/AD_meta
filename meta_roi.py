@@ -1,19 +1,21 @@
 #%%
-def sort_models(models, filenames, orderby='es', descend=True):
+def sort_models(models, orderby='es', descend=True):
+    filenames = models.keys()
+    models_list = models.values()
     if orderby == 'es':
-        list1 = [model.total_effect_size for model in models]
-    list1, models, filenames = (list(t) for t in zip(*sorted(zip(list1, models, filenames), reverse=descend)))
-    return list1, models, filenames
+        list1 = [model.total_effect_size for model in models_list]
+    list1, models_list, filenames = (list(t) for t in zip(*sorted(zip(list1, models_list, filenames), reverse=descend)))
+    return list1, dict(zip(filenames, models_list))
 
-def bon_cor(models, filenames, thres=0.05):
+def bon_cor(models, thres=0.05):
     passed = {}
     not_passed = {}
     n = len(models)
-    for model, filename in zip(models, filenames):
+    for name, model in models.items():
         if model.p * n <= thres:
-            passed[filename] = model
+            passed[name] = model
         else:
-            not_passed[filename] = model
+            not_passed[name] = model
     return passed, not_passed
 #%%
 # create csv for meta analysis
@@ -90,56 +92,6 @@ def create_csv_for_meta(centers, label_eg, label_cg, csv_prefix, out_path='./dat
                                 's2': cs,
                                 'n2': cn,})
 
-#%%
-"""
-from meta_analysis.main import csv_meta_analysis
-thress = [0.001]
-label_pairs = [(2,0), (2,1), (1,0)]
-csv_prefixs = ['roi_gmv_removed/', 'roi_ct_removed/']
-
-for csv_prefix in csv_prefixs:
-    for pair in label_pairs:
-        csv_dir = './data/meta_csv/{}_{}/{}'.format(pair[0], pair[1], csv_prefix)
-        out_dir = './results/meta/{}_{}/{}'.format(pair[0], pair[1], csv_prefix)
-        if not os.path.isdir(out_dir):
-            os.mkdir(out_dir)
-        csvs = os.listdir(csv_dir)
-        models = []
-        filenames = []
-        for f in csvs:
-            csv_path = os.path.join(csv_dir, f)
-            model = csv_meta_analysis(csv_path, model_type='random')
-            models.append(model)
-            filenames.append(f[:-4])
-
-        for thres in thress:
-            cor_model, not_passed = bon_cor(models, filenames, thres=thres)
-            print('{}_{}:{}_{}:{}'.format(csv_prefix, thres,pair[0], pair[1], len(cor_model)))
-        
-        list1, models, filenames = sort_models(models, filenames, descend=False)
-        top = len(models)
-        i = 0
-        
-        for model, filename in zip(models[:top], filenames[:top]):
-            out_path = os.path.join(out_dir, '{}_{}.png'.format(i, filename))
-            model.plot_forest(title=filename, save_path=out_path, show=False)
-            i += 1
-        
-        
-        csv_path = os.path.join(out_dir, 'TOP{}.csv'.format(top))
-        with open(csv_path, 'w', newline='') as file:
-            fieldnames = ['name', 'es', 'se', 'll', 'ul', 'z','p']
-            writer = csv.DictWriter(file, fieldnames=fieldnames)
-            writer.writeheader()
-            for model, filename in zip(models[:top], filenames[:top]):
-                writer.writerow({'name': filename,
-                 'es': round(model.total_effect_size,3),
-                  'se':round(model.total_standard_error,3), 
-                  'll':round(model.total_lower_limit,3), 
-                  'ul':round(model.total_upper_limit,3),
-                  'z':round(model.z, 3),
-                  'p':'{:.2e}'.format(model.p)})
-"""  
 # %%
 import nibabel as nib
 import pandas as pd
@@ -158,22 +110,23 @@ def meta_gmv(label_eg, label_cg, mask, save_nii=True,
              csv_prefix='roi_gmv_removed',
              csv_dir='./data/meta_csv',
              out_dir='./results/meta'):
-    nii_array = mask.data.astype(np.float32)
-    p_array = nii_array
+    models = {}
     prefix = '{}_{}/{}'.format(label_eg, label_cg, csv_prefix)
     csv_dir = os.path.join(csv_dir, prefix)
     out_dir = os.path.join(out_dir, prefix)
     if not os.path.isdir(out_dir):
         os.mkdir(out_dir)
     csvs = os.listdir(csv_dir)
-    models = {}
+    
     for f in csvs:
         csv_path = os.path.join(csv_dir, f)
         model = csv_meta_analysis(csv_path, model_type='random')
         models[f[:-4]] = model
 
     if save_nii:
-        ll = [i for i in range(1, 247)]
+        nii_array = mask.data.astype(np.float32)
+        p_array = nii_array
+        ll = mask.labels.tolist()
 
         for k, v in models.items():
             _id = int(k)
@@ -213,37 +166,36 @@ surf_dir = r'./data/mask/cat_surf_temp_fsavg32K/{}'
 
 def meta_ct(label_eg, label_cg, p_thres=0.001,
             topn=0.3, save_gii=True,
+            save_nii=False,
+            mask=None,
             csv_prefix='roi_ct_removed',
             csv_dir_prefix='./data/meta_csv',
             out_dir_prefix='./results/meta'):
-    return_models = {}
-    for annot, surf, lr in zip(annots, surfs, l_r):
-        a = surface.load_surf_data(annot_dir.format(annot))
-        a = a.astype(np.float32)
-        b = surf_dir.format(surf)
-        tmp_gii = nib.load(b)
+    models = {}
 
-        surfix = '{}_{}/{}'.format(label_eg, label_cg, csv_prefix)
-        csv_dir = os.path.join(csv_dir_prefix, surfix)
-        out_dir = os.path.join(out_dir_prefix, surfix)
-        if not os.path.isdir(out_dir):
-            os.mkdir(out_dir)
-        csvs = os.listdir(csv_dir)
-        models = []
-        filenames = []
-        for f in csvs:
-            csv_path = os.path.join(csv_dir, f)
-            model = csv_meta_analysis(csv_path, model_type='random')
-            models.append(model)
-            filenames.append(f[:-4])
-            return_models[f[:-4]] = model
+    surfix = '{}_{}/{}'.format(label_eg, label_cg, csv_prefix)
+    out_dir = os.path.join(out_dir_prefix, surfix)
+    if not os.path.isdir(out_dir):
+        os.mkdir(out_dir)
+    csv_dir = os.path.join(csv_dir_prefix, surfix)
+    csvs = os.listdir(csv_dir)
 
-        if save_gii:
-            cor_model, _ = bon_cor(models, filenames, thres=p_thres)
+    for f in csvs:
+        csv_path = os.path.join(csv_dir, f)
+        model = csv_meta_analysis(csv_path, model_type='random')
+        models[f[:-4]] = model
+    if save_gii:
+        for annot, surf, lr in zip(annots, surfs, l_r):
+            a = surface.load_surf_data(annot_dir.format(annot))
+            a = a.astype(np.float32)
+            b = surf_dir.format(surf)
+            tmp_gii = nib.load(b)
+
+            cor_model, _ = bon_cor(models, thres=p_thres)
             ll = np.unique(a).tolist()
             
-            _, models, filenames = sort_models(list(cor_model.values()), filenames, descend=False)
-            top_es = models[int(len(models)*topn)].total_effect_size
+            _, sorted_models = sort_models(cor_model, descend=False)
+            top_es = sorted_models[int(len(sorted_models)*topn)].total_effect_size
 
             for k, v in cor_model.items():
                 _id = np.float32(k)
@@ -259,6 +211,22 @@ def meta_ct(label_eg, label_cg, p_thres=0.001,
             tmp_gii.add_gifti_data_array(gdarray)
             path = os.path.join(out_dir, 'es_{}_bon{}_top{}.gii'.format(lr, str(p_thres)[2:], str(topn)[1:]))
             nib.save(tmp_gii, path)
-    return return_models
+    if save_nii:
+        nii_array = mask.data.astype(np.float32)
+        p_array = nii_array
 
-# %%
+        ll = mask.labels.tolist()
+
+        for k, v in models.items():
+            _id = int(k)
+            nii_array[nii_array==_id] = v.total_effect_size
+            p_array[p_array==_id] = v.p
+            ll.remove(_id)
+        for i in ll:
+            nii_array[nii_array==i] = 0
+
+        path = os.path.join(out_dir, 'es.nii')
+        p_path = os.path.join(out_dir, 'p.nii')
+        utils.gen_nii(nii_array, mask.nii, path)
+        utils.gen_nii(p_array, mask.nii, p_path)
+    return models
