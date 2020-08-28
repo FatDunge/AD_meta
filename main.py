@@ -131,6 +131,19 @@ for label_pair in label_pairs:
     correlation.cor_roi_confound(roi_gmv_models, confound_model, mask, gmv_out_dir)
     correlation.cor_roi_confound(roi_ct_models, confound_model, mask, ct_out_dir)
 #%%
+# abeta PET correlation
+from abeta_pet import pet_results
+out_dir_prefix = './results/correlation/abeta'
+label_pairs = [(2, 0)]
+for label_pair in label_pairs:
+    label_eg = label_pair[0]
+    label_cg = label_pair[1]
+    roi_gmv_models = meta_roi.meta_gmv(label_eg, label_cg, mask, save_nii=False)
+    pet_models = pet_results(label_eg, label_cg)
+    es1 = [v.total_effect_size for k,v in roi_gmv_models.items()]
+    es2 = [m.total_effect_size for m in pet_models]
+    draw_results.plot_correlation(es1, es2, 'Effect sizes of ROI GMV', 'Effect sizes of ROI PET')
+#%%
 # Correlation with JuSpace PET map
 pet_dir = './data/PET/masked_mean'
 out_dir_prefix = './results/correlation/{}_{}/{}/PET'
