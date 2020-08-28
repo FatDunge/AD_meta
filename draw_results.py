@@ -14,6 +14,8 @@ from matplotlib.transforms import Affine2D
 from matplotlib.markers import MarkerStyle
 import matplotlib.colors
 
+import seaborn as sns
+
 rgbs = ["#D81E5B", "#3D3B8E", "#D1710B", "#FFD5FF"]
 custom_cmap = matplotlib.colors.ListedColormap(rgbs, name='my_colormap')
 plt.ioff()
@@ -360,3 +362,21 @@ def plot_mmse_cor(centers, roi=1):
     plt.scatter(all_ages, all_roi_values, alpha=0.5)
     plt.title('r:{:.2f}, p:{:.2e}'.format(r, p))
     plt.show()
+
+def plot_correlation(values1, values2, column1_name='x', column2_name='y',
+                     out_path=None, show=True, save=False):
+    r = pearsonr(values1, values2)[0]
+    p = pearsonr(values1, values2)[1]
+
+    df = pd.DataFrame(
+                    {column1_name: values1,
+                    column2_name: values2,
+                    })
+
+    sns.regplot(x=column1_name, y=column2_name, data=df)
+    plt.title('r:{:.2f}, p:{:.2e}'.format(r, p))
+    if save:
+        plt.savefig(out_path)
+    if show:
+        plt.show()
+    plt.close()
